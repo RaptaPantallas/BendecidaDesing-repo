@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'inventario.db')
 
@@ -13,6 +14,26 @@ def get_db():
 def init_db():
     conn = get_db()
     cursor = conn.cursor()
+
+    # Tabla de usuarios
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            nombre TEXT NOT NULL,
+            rol TEXT DEFAULT 'admin'
+        )
+    ''')
+
+    # Crear usuario administrador por defecto si no existe
+    cursor.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'admin'")
+    if cursor.fetchone()[0] == 0:
+        default_hash = generate_password_hash('bendecida2026')
+        cursor.execute(
+            "INSERT INTO usuarios (username, password_hash, nombre, rol) VALUES (?, ?, ?, ?)",
+            ('admin', default_hash, 'Administrador Bendecida', 'admin')
+        )
 
     # Tabla de configuración
     cursor.execute('''
@@ -550,3 +571,21 @@ def get_dashboard_kpis():
         'top_prendas': top_prendas,
         'alertas_stock': alertas_stock
     }
+
+# Funciones de Autenticación
+def verificar_usuario(username, password):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM usuarios WHERE username = ?', (username.strip().lower(),))
+    user = cursor.fetchone()
+    conn.close()
+    if user and check_password_hash(user['password_hash'], password):
+        return dict(user)
+    return None
+
+def cambiar_password(usuario_id, nueva_password):
+    conn = get_db()
+    p_hash = generate_password_hash(nueva_password)
+    conn.execute('UPDATE usuarios SET password_hash = ? WHERE id = ?', (p_hash, usuario_id))
+    conn.commit()
+    conn.close()

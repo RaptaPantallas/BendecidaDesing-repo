@@ -80,9 +80,29 @@
         {% endfor %}
       </div>
 
-      <form onsubmit="agregarNuevaCategoria(event)" style="display: flex; gap: 0.5rem;">
-        <input type="text" id="nueva-cat-input" class="form-control" placeholder="Nueva categoría (ej: Pijamas)..." style="flex: 1;" required>
-        <button type="submit" class="btn btn-secondary">Agregar</button>
+    <!-- Cambio de Contraseña de Acceso -->
+    <div class="card">
+      <h3 style="font-size: 1.15rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span>🔐</span> Cambiar Contraseña
+      </h3>
+      <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1rem;">
+        Usuario activo: <strong>{{ username }}</strong>
+      </p>
+
+      <form id="form-cambio-clave" onsubmit="cambiarContrasenaSubmit(event)">
+        <div class="form-group" style="margin-bottom: 0.85rem;">
+          <label for="clave-actual">Contraseña Actual *</label>
+          <input type="password" id="clave-actual" class="form-control" placeholder="Contraseña actual..." required>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.15rem;">
+          <label for="clave-nueva">Nueva Contraseña *</label>
+          <input type="password" id="clave-nueva" class="form-control" placeholder="Nueva contraseña (min 4 letras)..." required>
+        </div>
+
+        <button type="submit" class="btn btn-secondary" style="width: 100%;">
+          <span>🔑</span> Actualizar Clave
+        </button>
       </form>
     </div>
 
@@ -135,8 +155,26 @@
       } else {
         showToast(resp.message || 'Error al crear', 'error');
       }
+  async function cambiarContrasenaSubmit(e) {
+    e.preventDefault();
+    const actual = document.getElementById('clave-actual').value;
+    const nueva = document.getElementById('clave-nueva').value;
+
+    try {
+      const res = await fetch('/api/usuario/cambiar_password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password_actual: actual, password_nueva: nueva })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        document.getElementById('form-cambio-clave').reset();
+      } else {
+        showToast(data.message || 'Error al cambiar contraseña', 'error');
+      }
     } catch (err) {
-      showToast('Error de red', 'error');
+      showToast('Error al procesar la solicitud', 'error');
     }
   }
 </script>

@@ -58,14 +58,22 @@
         </li>
       </ul>
 
-      <!-- Widget Tasa del Día -->
-      <div class="rate-widget-pill" onclick="abrirModalTasa()" title="Clic para actualizar la tasa del día (USD / Bs)">
-        <span class="rate-flag">🇻🇪</span>
-        <div>
-          <div class="rate-label">Tasa del Día</div>
-          <div class="rate-val" id="navbar-tasa-val">{{ "%.2f"|format(tasa_dolar) }} Bs/$</div>
+      <div style="display: flex; align-items: center; gap: 0.65rem;">
+        <!-- Widget Tasa del Día -->
+        <div class="rate-widget-pill" onclick="abrirModalTasa()" title="Clic para actualizar la tasa del día (USD / Bs)">
+          <span class="rate-flag">🇻🇪</span>
+          <div>
+            <div class="rate-label">Tasa del Día</div>
+            <div class="rate-val" id="navbar-tasa-val">{{ "%.2f"|format(tasa_dolar) }} Bs/$</div>
+          </div>
+          <span class="rate-edit-icon">✎</span>
         </div>
-        <span class="rate-edit-icon">✎</span>
+
+        <!-- Botón Salir / Logout -->
+        <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm" title="Cerrar sesión (Usuario: {{ username }})" style="border-radius: var(--radius-full); padding: 0.4rem 0.75rem; font-size: 0.8rem;">
+          <span>🚪</span>
+          <span style="display: inline-block;">Salir</span>
+        </a>
       </div>
     </div>
   </nav>

@@ -2,7 +2,7 @@ import os
 import io
 import csv
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file, flash, session
 
 import database as db
 
@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 import time
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'euler-tienda-secreto-2026-venezuela')
+app.secret_key = os.environ.get('SECRET_KEY', 'bendecida-desing-secreto-2026-venezuela')
 
 # Carpeta de subida de imágenes
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
@@ -36,7 +36,16 @@ def save_image_file(file):
 with app.app_context():
     db.init_db()
 
-# Inyectar configuración y tasa en todos los templates
+# Control de Acceso: Redirigir a Login si no está autenticado
+@app.before_request
+def require_login():
+    # Permitir archivos estáticos y la ruta de login sin autenticación
+    if request.endpoint in ['login', 'static'] or (request.path and request.path.startswith('/static')):
+        return
+    if not session.get('user_id'):
+        return redirect(url_for('login', next=request.url))
+
+# Inyectar configuración, tasa y usuario en todos los templates
 @app.context_processor
 def inject_global_data():
     config = db.get_config_dict()
@@ -45,8 +54,40 @@ def inject_global_data():
         'config': config,
         'tasa_dolar': tasa,
         'ultima_actualizacion_bcv': config.get('ultima_actualizacion_bcv', ''),
+        'current_user': session.get('user_name', 'Administrador'),
+        'username': session.get('username', 'admin'),
         'anio_actual': datetime.now().year
     }
+
+# ================= RUTAS DE AUTENTICACIÓN =================
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if session.get('user_id'):
+        return redirect(url_for('dashboard'))
+
+    error = None
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+
+        user = db.verificar_usuario(username, password)
+        if user:
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['user_name'] = user['nombre']
+            session['rol'] = user['rol']
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('dashboard'))
+        else:
+            error = 'Usuario o contraseña incorrectos. Verifique sus datos.'
+
+    return render_template('login.html', error=error)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 # ================= RUTAS DE VISTAS =================
 
@@ -320,6 +361,27 @@ def api_crear_categoria():
             return jsonify({'success': False, 'message': 'Nombre de categoría requerido'}), 400
         db.agregar_categoria(nombre)
         return jsonify({'success': True, 'message': 'Categoría añadida', 'categoria': nombre})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/usuario/cambiar_password', methods=['POST'])
+def api_cambiar_password():
+    try:
+        data = request.get_json() or request.form
+        actual = data.get('password_actual', '')
+        nueva = data.get('password_nueva', '')
+        
+        user_id = session.get('user_id')
+        username = session.get('username')
+        
+        if not db.verificar_usuario(username, actual):
+            return jsonify({'success': False, 'message': 'La contraseña actual es incorrecta'}), 400
+        
+        if len(nueva) < 4:
+            return jsonify({'success': False, 'message': 'La nueva contraseña debe tener al menos 4 caracteres'}), 400
+            
+        db.cambiar_password(user_id, nueva)
+        return jsonify({'success': True, 'message': '¡Contraseña actualizada exitosamente!'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
