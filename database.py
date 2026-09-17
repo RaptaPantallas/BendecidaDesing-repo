@@ -94,7 +94,7 @@ def init_db():
 
     # Configuraciones iniciales por defecto si no existen
     config_defaults = {
-        'nombre_tienda': 'Euler Moda & Estilo',
+        'nombre_tienda': 'Bendecida Desing',
         'telefono': '+58 412 1234567',
         'direccion': 'Centro Comercial Galería, Nivel 1, Local 14',
         'tasa_dolar': '65.50',
@@ -102,7 +102,7 @@ def init_db():
         'moneda_secundaria': 'VES',
         'simbolo_principal': '$',
         'simbolo_secundaria': 'Bs.',
-        'mensaje_recibo': '¡Gracias por apoyar el talento y la moda! Cambios dentro de los 3 días hábiles.'
+        'mensaje_recibo': '¡Gracias por elegir Bendecida Desing! Moda que te bendice y te hace brillar.'
     }
 
     for k, v in config_defaults.items():

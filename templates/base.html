@@ -8,7 +8,7 @@
   <!-- Tipografía Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- Estilos del Sistema -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
@@ -20,10 +20,12 @@
   <nav class="navbar">
     <div class="nav-container">
       <a href="{{ url_for('dashboard') }}" class="brand-section">
-        <div class="brand-icon">E</div>
+        <div class="brand-logo-frame">
+          <img src="{{ url_for('static', filename='img/logo_bendecida.png') }}" alt="Bendecida Desing" class="brand-logo-img">
+        </div>
         <div class="brand-info">
-          <h1>{{ config.nombre_tienda }}</h1>
-          <span>Moda & Control</span>
+          <h1 class="brand-name-title">Bendecida Desing</h1>
+          <span class="brand-subtitle">✨ Alta Moda & Boutique</span>
         </div>
       </a>
 
