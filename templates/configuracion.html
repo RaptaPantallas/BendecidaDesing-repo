@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración y Respaldos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h2>Configuración de la Tienda</h2>
+    <p>Ajustes de membrete de recibos, categorías y descarga de respaldos de seguridad</p>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem;">
+
+  <!-- Datos del Comercio y Recibos -->
+  <div class="card">
+    <h3 style="font-size: 1.15rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+      <span>🏬</span> Datos de la Tienda
+    </h3>
+    
+    <form id="form-config" onsubmit="guardarConfiguracion(event)">
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label for="conf-nombre">Nombre Comercial de la Tienda</label>
+        <input type="text" id="conf-nombre" name="nombre_tienda" class="form-control" value="{{ config.nombre_tienda }}" required>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label for="conf-telefono">Teléfono / WhatsApp de Atención</label>
+        <input type="text" id="conf-telefono" name="telefono" class="form-control" value="{{ config.telefono }}" required>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1rem;">
+        <label for="conf-direccion">Dirección Física / Local Comercial</label>
+        <input type="text" id="conf-direccion" name="direccion" class="form-control" value="{{ config.direccion }}" required>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label for="conf-mensaje">Mensaje al Pie del Recibo / Ticket</label>
+        <textarea id="conf-mensaje" name="mensaje_recibo" class="form-control" rows="3" style="resize: vertical;">{{ config.mensaje_recibo }}</textarea>
+        <span class="form-helper">Aparecerá en el comprobante impreso o compartido con el cliente.</span>
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        <span>💾</span> Guardar Cambios
+      </button>
+    </form>
+  </div>
+
+  <!-- Panel de Respaldos de Base de Datos y Categorías -->
+  <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    
+    <!-- Respaldo SQLite (Clave del Mantenimiento) -->
+    <div class="card" style="border-color: rgba(200, 155, 60, 0.35); background: linear-gradient(180deg, rgba(200, 155, 60, 0.04) 0%, var(--bg-surface) 100%);">
+      <h3 style="font-size: 1.15rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; color: var(--primary-light);">
+        <span>🛡️</span> Copia de Seguridad de la Base de Datos
+      </h3>
+      <p style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.5; margin-bottom: 1.25rem;">
+        Descargue una copia exacta del archivo <strong>inventario.db</strong>. Este archivo contiene todas sus prendas, ventas registradas, precios y configuración. Es la garantía de que nunca perderá su información.
+      </p>
+
+      <div style="background: var(--bg-card); padding: 0.9rem; border-radius: 8px; border: 1px solid var(--border-subtle); margin-bottom: 1.25rem; font-size: 0.82rem; color: var(--text-muted);">
+        <strong style="color: #fff;">💡 Recomendación operativa:</strong>
+        <br>Descargar este respaldo una vez por semana o quincenalmente y guardarlo en un pendrive o Google Drive.
+      </div>
+
+      <a href="{{ url_for('descargar_respaldo') }}" class="btn btn-emerald" style="width: 100%; padding: 0.85rem; font-size: 0.95rem;">
+        <span>📥</span> Descargar Base de Datos (.db) Ahora
+      </a>
+    </div>
+
+    <!-- Gestión de Categorías de Ropa -->
+    <div class="card">
+      <h3 style="font-size: 1.15rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span>🏷️</span> Categorías de Prendas
+      </h3>
+      
+      <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.25rem;">
+        {% for cat in categorias %}
+          <span class="badge badge-gray" style="font-size: 0.82rem; padding: 0.35rem 0.65rem;">{{ cat }}</span>
+        {% endfor %}
+      </div>
+
+      <form onsubmit="agregarNuevaCategoria(event)" style="display: flex; gap: 0.5rem;">
+        <input type="text" id="nueva-cat-input" class="form-control" placeholder="Nueva categoría (ej: Pijamas)..." style="flex: 1;" required>
+        <button type="submit" class="btn btn-secondary">Agregar</button>
+      </form>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  async function guardarConfiguracion(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+      const res = await fetch('/api/configuracion/guardar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const resp = await res.json();
+      if (resp.success) {
+        showToast(resp.message, 'success');
+      } else {
+        showToast(resp.message || 'Error al guardar', 'error');
+      }
+    } catch (err) {
+      showToast('Error de conexión', 'error');
+    }
+  }
+
+  async function agregarNuevaCategoria(e) {
+    e.preventDefault();
+    const input = document.getElementById('nueva-cat-input');
+    const nombre = input.value.trim();
+    if (!nombre) return;
+
+    try {
+      const res = await fetch('/api/categorias/crear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombre })
+      });
+      const resp = await res.json();
+      if (resp.success) {
+        showToast(`Categoría "${nombre}" añadida`, 'success');
+        setTimeout(() => window.location.reload(), 500);
+      } else {
+        showToast(resp.message || 'Error al crear', 'error');
+      }
+    } catch (err) {
+      showToast('Error de red', 'error');
+    }
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}Inventario de Prendas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h2>Catálogo de Prendas</h2>
+    <p>Administre el stock, tallas, colores y precios en dólares y bolívares</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-primary" onclick="abrirModalNuevaPrenda()">
+      <span>➕</span> Registrar Prenda
+    </button>
+  </div>
+</div>
+
+<!-- Filtros de Búsqueda -->
+<form method="GET" action="{{ url_for('inventario') }}" class="filter-bar">
+  <div class="search-input-wrap">
+    <span class="search-icon">🔍</span>
+    <input 
+      type="text" 
+      name="q" 
+      placeholder="Buscar por código, nombre o color..." 
+      value="{{ busqueda }}"
+      autocomplete="off"
+    >
+  </div>
+
+  <select name="categoria" class="form-select" onchange="this.form.submit()">
+    <option value="TODAS" {% if categoria_actual == 'TODAS' %}selected{% endif %}>Todas las Categorías</option>
+    {% for cat in categorias %}
+      <option value="{{ cat }}" {% if categoria_actual == cat %}selected{% endif %}>{{ cat }}</option>
+    {% endfor %}
+  </select>
+
+  <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.88rem; cursor: pointer; color: var(--text-muted); user-select: none;">
+    <input 
+      type="checkbox" 
+      name="stock_bajo" 
+      value="1" 
+      {% if stock_bajo %}checked{% endif %} 
+      onchange="this.form.submit()"
+      style="accent-color: var(--primary);"
+    >
+    <span>Solo Stock Bajo / Crítico</span>
+  </label>
+
+  {% if busqueda or categoria_actual != 'TODAS' or stock_bajo %}
+    <a href="{{ url_for('inventario') }}" class="btn btn-secondary btn-sm">Limpiar Filtros</a>
+  {% endif %}
+</form>
+
+<!-- Tabla de Inventario -->
+<div class="table-responsive">
+  <table class="table">
+    <thead>
+      <tr>
+        <th style="width: 54px; text-align: center;">Foto</th>
+        <th>Código / SKU</th>
+        <th>Prenda</th>
+        <th>Categoría</th>
+        <th>Talla</th>
+        <th>Color</th>
+        <th style="text-align: right;">Costo ($)</th>
+        <th style="text-align: right;">Precio Venta</th>
+        <th style="text-align: center;">Stock</th>
+        <th style="text-align: center;">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if prendas %}
+        {% for p in prendas %}
+        <tr id="prenda-row-{{ p.id }}" data-stock-minimo="{{ p.stock_minimo }}" class="{% if p.stock == 0 %}table-row-danger{% elif p.stock <= p.stock_minimo %}table-row-warning{% endif %}">
+          <td style="text-align: center;">
+            <div class="prenda-thumb-wrap">
+              {% if p.imagen %}
+                <img src="{{ p.imagen }}" alt="{{ p.nombre }}" class="prenda-thumb-img" loading="lazy">
+              {% else %}
+                <span class="prenda-thumb-placeholder">👗</span>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <code style="background: rgba(255,255,255,0.06); padding: 0.2rem 0.45rem; border-radius: 4px; font-weight: 600; color: var(--primary-light);">
+              {{ p.codigo }}
+            </code>
+          </td>
+          <td>
+            <strong>{{ p.nombre }}</strong>
+          </td>
+          <td>
+            <span class="badge badge-gray">{{ p.categoria }}</span>
+          </td>
+          <td>
+            <span class="badge-pill-talla">{{ p.talla }}</span>
+          </td>
+          <td>{{ p.color }}</td>
+          <td style="text-align: right; color: var(--text-muted);">
+            ${{ "%.2f"|format(p.precio_costo) }}
+          </td>
+          <td style="text-align: right;">
+            <div style="font-weight: 700; color: #fff;">${{ "%.2f"|format(p.precio_venta) }}</div>
+            <div style="font-size: 0.78rem; color: var(--primary-light);">{{ "%.2f"|format(p.precio_venta * tasa) }} Bs.</div>
+          </td>
+          <td style="text-align: center;">
+            <div class="stock-stepper">
+              <button onclick="ajustarStockRapido({{ p.id }}, -1)" title="Restar 1">-</button>
+              <span class="stock-val" id="stock-val-{{ p.id }}">{{ p.stock }}</span>
+              <button onclick="ajustarStockRapido({{ p.id }}, 1)" title="Sumar 1">+</button>
+            </div>
+            <div style="margin-top: 0.25rem;">
+              {% if p.stock == 0 %}
+                <span class="badge badge-rose" style="font-size: 0.68rem;">Agotado</span>
+              {% elif p.stock <= p.stock_minimo %}
+                <span class="badge badge-amber" style="font-size: 0.68rem;">Bajo (Min: {{ p.stock_minimo }})</span>
+              {% endif %}
+            </div>
+          </td>
+          <td style="text-align: center;">
+            <div style="display: flex; gap: 0.4rem; justify-content: center;">
+              <button 
+                class="btn btn-secondary btn-icon-only btn-sm" 
+                title="Editar Prenda"
+                onclick='abrirModalEditarPrenda({{ p|tojson }})'
+              >
+                ✏️
+              </button>
+              <button 
+                class="btn btn-rose btn-icon-only btn-sm" 
+                title="Eliminar / Retirar"
+                onclick="confirmarEliminarPrenda({{ p.id }}, '{{ p.nombre|replace("'", "\\'") }}')"
+              >
+                🗑️
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="10" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+            No se encontraron prendas con los criterios seleccionados.
+          </td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal: Registrar o Editar Prenda -->
+<div id="modal-prenda" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modal-prenda-title">Registrar Nueva Prenda</h3>
+      <button class="modal-close" onclick="closeModal('modal-prenda')">&times;</button>
+    </div>
+    <form id="form-prenda" onsubmit="submitPrendaForm(event)">
+      <div class="modal-body">
+        <div class="form-grid">
+          
+          <!-- Foto de la Prenda -->
+          <div class="form-group col-span-2">
+            <label>Foto de la Prenda (Cámara o Galería)</label>
+            <div class="image-upload-box" onclick="document.getElementById('p-imagen').click()">
+              <div id="image-upload-placeholder">
+                <div style="font-size: 1.7rem; margin-bottom: 0.15rem;">📸</div>
+                <div style="font-weight: 600; font-size: 0.88rem; color: #fff;">Tomar foto con el celular o subir archivo</div>
+                <div style="font-size: 0.74rem; color: var(--text-muted);">Formatos: JPG, PNG, WEBP (Se guardará en la app)</div>
+              </div>
+              <div id="image-preview-container" class="image-preview-container">
+                <img id="image-preview-element" src="" alt="Vista previa">
+              </div>
+              <input 
+                type="file" 
+                id="p-imagen" 
+                name="imagen" 
+                accept="image/*" 
+                capture="environment" 
+                style="display: none;" 
+                onchange="previewPrendaImagen(this)"
+              >
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="p-codigo">Código / SKU / Código de Barras *</label>
+            <input type="text" id="p-codigo" name="codigo" class="form-control" placeholder="Ej: BLU-001 o escanear" required>
+          </div>
+
+          <div class="form-group">
+            <label for="p-categoria">Categoría *</label>
+            <select id="p-categoria" name="categoria" class="form-select" required>
+              {% for cat in categorias %}
+                <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group col-span-2">
+            <label for="p-nombre">Descripción de la Prenda *</label>
+            <input type="text" id="p-nombre" name="nombre" class="form-control" placeholder="Ej: Blusa Satinada Manga Larga" required>
+          </div>
+
+          <div class="form-group">
+            <label for="p-talla">Talla *</label>
+            <input type="text" id="p-talla" name="talla" class="form-control" placeholder="Ej: S, M, L, 32, Única" required>
+          </div>
+
+          <div class="form-group">
+            <label for="p-color">Color *</label>
+            <input type="text" id="p-color" name="color" class="form-control" placeholder="Ej: Negro, Rosa, Blanco" required>
+          </div>
+
+          <div class="form-group">
+            <label for="p-costo">Costo de Compra ($ USD)</label>
+            <input type="number" step="0.01" min="0" id="p-costo" name="precio_costo" class="form-control" placeholder="0.00" value="0.00">
+          </div>
+
+          <div class="form-group">
+            <label for="p-venta">Precio de Venta ($ USD) *</label>
+            <input 
+              type="number" 
+              step="0.01" 
+              min="0.01" 
+              id="p-venta" 
+              name="precio_venta" 
+              class="form-control" 
+              placeholder="0.00" 
+              required
+              oninput="actualizarEquivalenteBs(this.value)"
+            >
+            <span id="p-venta-bs-preview" class="form-helper" style="color: var(--primary-light);">
+              ≈ 0.00 Bs. (a tasa activa)
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label for="p-stock">Stock Inicial (Piezas) *</label>
+            <input type="number" min="0" id="p-stock" name="stock" class="form-control" value="1" required>
+          </div>
+
+          <div class="form-group">
+            <label for="p-minimo">Stock Mínimo de Alerta</label>
+            <input type="number" min="1" id="p-minimo" name="stock_minimo" class="form-control" value="2" required>
+            <span class="form-helper">Avisará cuando queden estas unidades o menos</span>
+          </div>
+
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-prenda')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-prenda">Guardar Prenda</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function actualizarEquivalenteBs(valUsd) {
+    const preview = document.getElementById('p-venta-bs-preview');
+    const num = parseFloat(valUsd);
+    if (!isNaN(num) && num > 0) {
+      const bs = num * CURRENT_TASA;
+      preview.textContent = `≈ ${bs.toFixed(2)} Bs. (a ${CURRENT_TASA.toFixed(2)} Bs/$)`;
+    } else {
+      preview.textContent = '≈ 0.00 Bs. (a tasa activa)';
+    }
+  }
+
+  function resetImagePreview() {
+    const previewBox = document.getElementById('image-preview-container');
+    const previewImg = document.getElementById('image-preview-element');
+    const placeholder = document.getElementById('image-upload-placeholder');
+    const fileInput = document.getElementById('p-imagen');
+    
+    if (fileInput) fileInput.value = '';
+    if (previewImg) previewImg.src = '';
+    if (previewBox) previewBox.style.display = 'none';
+    if (placeholder) placeholder.style.display = 'block';
+  }
+
+  function abrirModalNuevaPrenda() {
+    const form = document.getElementById('form-prenda');
+    form.reset();
+    delete form.dataset.editId;
+    document.getElementById('modal-prenda-title').textContent = 'Registrar Nueva Prenda';
+    document.getElementById('btn-submit-prenda').textContent = 'Guardar Prenda';
+    document.getElementById('p-stock').disabled = false;
+    resetImagePreview();
+    actualizarEquivalenteBs(0);
+    openModal('modal-prenda');
+  }
+
+  function abrirModalEditarPrenda(prenda) {
+    const form = document.getElementById('form-prenda');
+    form.dataset.editId = prenda.id;
+    document.getElementById('modal-prenda-title').textContent = `Editar Prenda: ${prenda.codigo}`;
+    document.getElementById('btn-submit-prenda').textContent = 'Actualizar Cambios';
+
+    document.getElementById('p-codigo').value = prenda.codigo;
+    document.getElementById('p-nombre').value = prenda.nombre;
+    document.getElementById('p-categoria').value = prenda.categoria;
+    document.getElementById('p-talla').value = prenda.talla;
+    document.getElementById('p-color').value = prenda.color;
+    document.getElementById('p-costo').value = prenda.precio_costo;
+    document.getElementById('p-venta').value = prenda.precio_venta;
+    document.getElementById('p-stock').value = prenda.stock;
+    document.getElementById('p-minimo').value = prenda.stock_minimo;
+
+    resetImagePreview();
+    if (prenda.imagen) {
+      const previewBox = document.getElementById('image-preview-container');
+      const previewImg = document.getElementById('image-preview-element');
+      const placeholder = document.getElementById('image-upload-placeholder');
+      if (previewImg) previewImg.src = prenda.imagen;
+      if (previewBox) previewBox.style.display = 'block';
+      if (placeholder) placeholder.style.display = 'none';
+    }
+
+    actualizarEquivalenteBs(prenda.precio_venta);
+    openModal('modal-prenda');
+  }
+</script>
+{% endblock %}

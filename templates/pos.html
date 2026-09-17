@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}Punto de Venta (POS){% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom: 1rem;">
+  <div class="page-title-group">
+    <h2>Terminal de Venta y Salidas</h2>
+    <p>Seleccione prendas para cobrar rápidamente en dólares o bolívares</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary btn-sm" onclick="clearCart()">
+      <span>🗑️</span> Vaciar Carrito
+    </button>
+  </div>
+</div>
+
+<div class="pos-container">
+  
+  <!-- Catálogo de Prendas (Columna Izquierda) -->
+  <div class="pos-catalog">
+    
+    <!-- Filtros de búsqueda rápida en POS -->
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <div class="search-input-wrap" style="flex: 1;">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          id="pos-search-input" 
+          placeholder="Escanear código de barra o escribir nombre / color..." 
+          oninput="filterPosCatalog()"
+          autocomplete="off"
+          autofocus
+        >
+      </div>
+    </div>
+
+    <!-- Pestañas de categorías -->
+    <div style="display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.35rem;">
+      <button class="btn btn-secondary btn-sm cat-pill active" onclick="setPosCategory('TODAS', this)">Todas</button>
+      {% for cat in categorias %}
+        <button class="btn btn-secondary btn-sm cat-pill" onclick="setPosCategory('{{ cat }}', this)">{{ cat }}</button>
+      {% endfor %}
+    </div>
+
+    <!-- Grilla de Tarjetas de Prendas -->
+    <div class="pos-grid" id="pos-grid-container">
+      {% for p in prendas %}
+      <div 
+        class="pos-card {% if p.stock <= 0 %}out-of-stock{% endif %}"
+        data-nombre="{{ p.nombre }}"
+        data-codigo="{{ p.codigo }}"
+        data-color="{{ p.color }}"
+        data-categoria="{{ p.categoria }}"
+        onclick='addToCart({{ p|tojson }})'
+      >
+        <!-- Foto de la Prenda -->
+        <div class="pos-card-img-wrap">
+          {% if p.imagen %}
+            <img src="{{ p.imagen }}" alt="{{ p.nombre }}" class="pos-card-img" loading="lazy">
+          {% else %}
+            <span class="pos-card-img-placeholder">👗</span>
+          {% endif %}
+        </div>
+
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <span class="pos-card-code">{{ p.codigo }}</span>
+            {% if p.stock <= 0 %}
+              <span class="badge badge-rose" style="font-size: 0.65rem;">Agotado</span>
+            {% elif p.stock <= p.stock_minimo %}
+              <span class="badge badge-amber" style="font-size: 0.65rem;">Quedan {{ p.stock }}</span>
+            {% else %}
+              <span class="badge badge-emerald" style="font-size: 0.65rem;">{{ p.stock }} disp.</span>
+            {% endif %}
+          </div>
+          <h4 class="pos-card-title">{{ p.nombre }}</h4>
+          <div class="pos-card-meta">
+            <span class="badge-pill-talla">Talla: {{ p.talla }}</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">{{ p.color }}</span>
+          </div>
+        </div>
+
+        <div class="pos-card-pricing">
+          <div>
+            <div class="pos-price-usd">${{ "%.2f"|format(p.precio_venta) }}</div>
+            <div class="pos-price-bs">{{ "%.2f"|format(p.precio_venta * tasa) }} Bs.</div>
+          </div>
+          <span style="color: var(--primary-light); font-size: 1.25rem;">+</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+
+  <!-- Panel del Carrito / Cuenta (Columna Derecha) -->
+  <div class="pos-cart-panel" id="pos-cart-panel">
+    
+    <div class="pos-cart-header">
+      <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span>🛒</span> Cuenta Actual
+      </h3>
+      <span class="badge badge-emerald" id="pos-cart-count">0 piezas</span>
+    </div>
+
+    <!-- Lista de items en el carrito -->
+    <div class="pos-cart-items" id="pos-cart-items">
+      <div id="pos-empty-state" style="text-align:center; padding: 3rem 1rem; color: var(--text-muted);">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem; opacity: 0.5;">🛍️</div>
+        <p style="font-size: 0.95rem;">El carrito está vacío</p>
+        <p style="font-size: 0.78rem;">Haga clic en las prendas del catálogo para agregar</p>
+      </div>
+    </div>
+
+    <!-- Totales y Acción de Cobro -->
+    <div class="pos-totals">
+      <div class="total-row grand-usd">
+        <span>Total a Pagar:</span>
+        <span id="pos-total-usd">$0.00</span>
+      </div>
+      <div class="total-row grand-bs">
+        <span>En Bolívares:</span>
+        <span id="pos-total-bs">0.00 Bs.</span>
+      </div>
+
+      <button 
+        class="btn btn-primary" 
+        id="btn-procesar-venta" 
+        style="width: 100%; padding: 0.85rem; font-size: 1.05rem;"
+        onclick="abrirModalCobro()"
+        disabled
+      >
+        <span>⚡</span> Registrar Venta / Cobrar
+      </button>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Botón Flotante de Carrito para Celulares (Mobile) -->
+<div class="mobile-cart-float-bar" id="mobile-cart-float-bar" onclick="mostrarCarritoMovil()">
+  <div style="display: flex; align-items: center; gap: 0.5rem;">
+    <span style="font-size: 1.25rem;">🛍️</span>
+    <span id="mobile-cart-items-count">0 piezas</span>
+  </div>
+  <div>
+    <span id="mobile-cart-total-usd" style="font-size: 1.1rem; font-family: var(--font-heading);">$0.00</span>
+    <span id="mobile-cart-total-bs" style="font-size: 0.75rem; margin-left: 0.25rem; opacity: 0.9;">(0.00 Bs.)</span>
+    <span style="margin-left: 0.35rem; font-size: 1.1rem;">&rarr;</span>
+  </div>
+</div>
+
+<!-- Modal: Confirmación y Método de Pago -->
+<div id="modal-checkout" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 class="modal-title">Confirmar Venta</h3>
+      <button class="modal-close" onclick="closeModal('modal-checkout')">&times;</button>
+    </div>
+    <form onsubmit="procesarVentaSubmit(event)">
+      <div class="modal-body">
+        
+        <!-- Cuadro de Monto -->
+        <div style="background: rgba(200, 155, 60, 0.1); border: 1px solid rgba(200, 155, 60, 0.25); border-radius: 8px; padding: 1rem; text-align: center; margin-bottom: 1.25rem;">
+          <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Total de la Compra</div>
+          <div style="font-size: 2rem; font-weight: 800; font-family: var(--font-heading);" id="checkout-modal-usd">$0.00</div>
+          <div style="font-size: 1.1rem; font-weight: 700; color: var(--primary-light);" id="checkout-modal-bs">0.00 Bs.</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Tasa de cálculo: <span id="checkout-modal-tasa">0.00 Bs/$</span></div>
+        </div>
+
+        <div class="form-grid">
+          
+          <div class="form-group col-span-2">
+            <label for="checkout-metodo-pago">Método de Pago *</label>
+            <select id="checkout-metodo-pago" class="form-select" required>
+              <option value="Efectivo Divisas ($)">💵 Efectivo Divisas ($ USD)</option>
+              <option value="Pago Móvil (Bs)">📲 Pago Móvil (Bs)</option>
+              <option value="Punto de Venta / Tarjeta (Bs)">💳 Punto de Venta / Tarjeta Débito (Bs)</option>
+              <option value="Zelle ($)">🏦 Zelle ($ USD)</option>
+              <option value="Efectivo Bolívares (Bs)">💵 Efectivo Bolívares (Bs)</option>
+              <option value="Binance Pay / USDT">🪙 Binance Pay / USDT</option>
+              <option value="Mixto / Combinado">🔀 Pago Mixto (Divisas + Pago Móvil)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="checkout-cliente-nombre">Nombre del Cliente</label>
+            <input type="text" id="checkout-cliente-nombre" class="form-control" placeholder="Cliente General" value="Cliente General">
+          </div>
+
+          <div class="form-group">
+            <label for="checkout-cliente-telefono">Teléfono / WhatsApp</label>
+            <input type="text" id="checkout-cliente-telefono" class="form-control" placeholder="Ej: 0412-1234567">
+          </div>
+
+          <div class="form-group col-span-2">
+            <label for="checkout-notas">Observaciones / Referencia Bancaria</label>
+            <input type="text" id="checkout-notas" class="form-control" placeholder="Ej: Ref #4589 o billete $20">
+          </div>
+
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-checkout')">Volver</button>
+        <button type="submit" class="btn btn-primary" id="btn-confirmar-cobro">Confirmar y Cobrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Recibo / Ticket Imprimible -->
+<div id="modal-ticket" class="modal-overlay">
+  <div class="modal-box" style="max-width: 440px;">
+    <div class="modal-header no-print">
+      <h3 class="modal-title">Comprobante de Venta</h3>
+      <button class="modal-close" onclick="closeModal('modal-ticket')">&times;</button>
+    </div>
+    
+    <div class="modal-body" style="background: #f8fafc; padding: 1rem;">
+      <!-- Contenedor del Ticket para impresión -->
+      <div id="ticket-modal-content" class="ticket-print-area">
+        <div class="ticket-header">
+          <div class="ticket-title">{{ config.nombre_tienda }}</div>
+          <div>{{ config.direccion }}</div>
+          <div>Telf: {{ config.telefono }}</div>
+          <div style="margin-top: 0.35rem; font-weight: bold;">RECIBO: <span id="ticket-recibo-nro">REC-0000</span></div>
+          <div style="font-size: 11px; color: #555;" id="ticket-fecha">Fecha y hora</div>
+        </div>
+
+        <div>
+          <div><strong>Cliente:</strong> <span id="ticket-cliente">Cliente General</span></div>
+          <div><strong>Pago:</strong> <span id="ticket-metodo">Efectivo</span></div>
+          <div><strong>Tasa Ref.:</strong> <span id="ticket-tasa">0.00 Bs/$</span></div>
+        </div>
+
+        <table class="ticket-table">
+          <thead>
+            <tr style="border-bottom: 1px solid #000;">
+              <th style="text-align: left;">Cant / Prenda</th>
+              <th style="text-align: center;">U.</th>
+              <th style="text-align: right;">Total ($)</th>
+            </tr>
+          </thead>
+          <tbody id="ticket-items-tbody"></tbody>
+        </table>
+
+        <div class="ticket-totals">
+          <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 15px;">
+            <span>TOTAL ($):</span>
+            <span id="ticket-total-usd">$0.00</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 13px;">
+            <span>TOTAL (Bs):</span>
+            <span id="ticket-total-bs">0.00 Bs.</span>
+          </div>
+        </div>
+
+        <div class="ticket-footer">
+          {{ config.mensaje_recibo }}
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer no-print">
+      <button class="btn btn-secondary" onclick="imprimirTicket()">🖨️ Imprimir Ticket</button>
+      <button class="btn btn-primary" onclick="closeModal('modal-ticket')">Nueva Venta</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/pos.js') }}"></script>
+{% endblock %}

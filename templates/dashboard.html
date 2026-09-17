@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard General{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h2>Panel de Control</h2>
+    <p>Resumen en tiempo real del inventario y ventas en divisas y bolívares</p>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('pos') }}" class="btn btn-primary">
+      <span>💳</span> Cobrar en POS
+    </a>
+    <a href="{{ url_for('inventario') }}" class="btn btn-secondary">
+      <span>👗</span> Ver Inventario
+    </a>
+  </div>
+</div>
+
+<!-- Tarjetas KPI Principales -->
+<div class="kpi-grid">
+  <!-- Ventas Hoy -->
+  <div class="kpi-card emerald">
+    <div class="kpi-header">
+      <span class="kpi-title">Ventas de Hoy</span>
+      <span class="kpi-icon">💰</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val">${{ "%.2f"|format(kpis.ventas_hoy_usd) }}</div>
+      <div class="kpi-sub-val">{{ "%.2f"|format(kpis.ventas_hoy_bs) }} Bs.</div>
+    </div>
+    <div class="kpi-foot">
+      <span>{{ kpis.total_ventas_hoy }} transacciones registradas hoy</span>
+    </div>
+  </div>
+
+  <!-- Valor del Inventario -->
+  <div class="kpi-card blue">
+    <div class="kpi-header">
+      <span class="kpi-title">Valor en Inventario</span>
+      <span class="kpi-icon">🏷️</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val">${{ "%.2f"|format(kpis.valor_inventario_usd) }}</div>
+      <div class="kpi-sub-val">{{ "%.2f"|format(kpis.valor_inventario_bs) }} Bs.</div>
+    </div>
+    <div class="kpi-foot">
+      <span>Calculado a la tasa activa ({{ "%.2f"|format(kpis.tasa_dolar) }} Bs/$)</span>
+    </div>
+  </div>
+
+  <!-- Stock Total -->
+  <div class="kpi-card">
+    <div class="kpi-header">
+      <span class="kpi-title">Prendas en Tienda</span>
+      <span class="kpi-icon">👗</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val">{{ kpis.total_unidades }} <span style="font-size: 1rem; color: var(--text-muted); font-weight: normal;">piezas</span></div>
+      <div class="kpi-sub-val">{{ kpis.total_modelos }} modelos / referencias</div>
+    </div>
+    <div class="kpi-foot">
+      <span>Total de catálogo activo</span>
+    </div>
+  </div>
+
+  <!-- Alerta Stock Bajo -->
+  <div class="kpi-card rose">
+    <div class="kpi-header">
+      <span class="kpi-title">Alertas de Stock</span>
+      <span class="kpi-icon">⚠️</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val" style="color: var(--accent-rose);">{{ kpis.total_stock_bajo }}</div>
+      <div class="kpi-sub-val" style="color: var(--accent-rose);">Prendas por agotarse</div>
+    </div>
+    <div class="kpi-foot">
+      <a href="{{ url_for('inventario', stock_bajo=1) }}" style="color: var(--primary-light); text-decoration: none;">Ver prendas en riesgo &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Grid de Paneles Secundarios: Alertas y Más Vendidos -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem;">
+  
+  <!-- Panel de Alertas de Stock Mínimo -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <h3 style="font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span style="color: var(--accent-rose);">⚠️</span> Stock Mínimo / Por Reponer
+      </h3>
+      <a href="{{ url_for('inventario', stock_bajo=1) }}" class="btn btn-secondary btn-sm">Ver Todas</a>
+    </div>
+
+    {% if kpis.alertas_stock %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Prenda</th>
+              <th>Talla / Color</th>
+              <th style="text-align: center;">Stock</th>
+              <th style="text-align: right;">Precio ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in kpis.alertas_stock %}
+            <tr class="{% if p.stock == 0 %}table-row-danger{% else %}table-row-warning{% endif %}">
+              <td>
+                <strong>{{ p.nombre }}</strong><br>
+                <small style="color: var(--text-muted);">{{ p.codigo }}</small>
+              </td>
+              <td>
+                <span class="badge-pill-talla">{{ p.talla }}</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.25rem;">{{ p.color }}</span>
+              </td>
+              <td style="text-align: center;">
+                {% if p.stock == 0 %}
+                  <span class="badge badge-rose">Agotado (0)</span>
+                {% else %}
+                  <span class="badge badge-amber">{{ p.stock }} unid. (Min: {{ p.stock_minimo }})</span>
+                {% endif %}
+              </td>
+              <td style="text-align: right; font-weight: 600;">
+                ${{ "%.2f"|format(p.precio_venta) }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">✨</div>
+        <p>¡Excelente! Todas las prendas tienen stock suficiente por encima del mínimo.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Panel de Prendas Más Vendidas -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <h3 style="font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span style="color: var(--primary-light);">🔥</span> Prendas Más Vendidas
+      </h3>
+      <a href="{{ url_for('ventas') }}" class="btn btn-secondary btn-sm">Historial</a>
+    </div>
+
+    {% if kpis.top_prendas %}
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Prenda</th>
+              <th>Talla / Color</th>
+              <th style="text-align: right;">Total Vendido</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for top in kpis.top_prendas %}
+            <tr>
+              <td><strong>{{ top.nombre }}</strong></td>
+              <td>
+                <span class="badge-pill-talla">{{ top.talla }}</span>
+                <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 0.25rem;">{{ top.color }}</span>
+              </td>
+              <td style="text-align: right;">
+                <span class="badge badge-emerald" style="font-size: 0.85rem;">{{ top.total_vendido }} piezas</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">🛍️</div>
+        <p>Aún no hay ventas registradas en el sistema.</p>
+        <a href="{{ url_for('pos') }}" class="btn btn-primary btn-sm" style="margin-top: 0.75rem;">Hacer primera venta</a>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
