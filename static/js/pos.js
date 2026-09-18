@@ -129,14 +129,15 @@ function updateTotals(totalUsd) {
   if (elUsd) elUsd.textContent = `$${totalUsd.toFixed(2)}`;
   if (elBs) elBs.textContent = `${totalBs.toFixed(2)} Bs.`;
 
-  // Actualizar barra flotante móvil
+  // Actualizar barra flotante móvil (solo en pantallas móviles <= 768px)
   const mobileBar = document.getElementById('mobile-cart-float-bar');
   const mobileCount = document.getElementById('mobile-cart-items-count');
   const mobileUsd = document.getElementById('mobile-cart-total-usd');
   const mobileBs = document.getElementById('mobile-cart-total-bs');
 
   if (mobileBar) {
-    if (totalPiezas > 0) {
+    const esMovil = window.innerWidth <= 768;
+    if (totalPiezas > 0 && esMovil) {
       mobileBar.style.display = 'flex';
       if (mobileCount) mobileCount.textContent = `${totalPiezas} pieza${totalPiezas > 1 ? 's' : ''}`;
       if (mobileUsd) mobileUsd.textContent = `$${totalUsd.toFixed(2)}`;

@@ -35,6 +35,15 @@ def init_db():
             ('admin', default_hash, 'Administrador Bendecida', 'admin')
         )
 
+    # Crear usuario vendedor/cajero si no existe
+    cursor.execute("SELECT COUNT(*) FROM usuarios WHERE username = 'vendedor'")
+    if cursor.fetchone()[0] == 0:
+        cajero_hash = generate_password_hash('1234')
+        cursor.execute(
+            "INSERT INTO usuarios (username, password_hash, nombre, rol) VALUES (?, ?, ?, ?)",
+            ('vendedor', cajero_hash, 'Caja y Ventas', 'cajero')
+        )
+
     # Tabla de configuración
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS configuracion (
@@ -691,20 +700,45 @@ def actualizar_proveedor(proveedor_id, datos):
     conn.commit()
     conn.close()
 
-def eliminar_o_desactivar_proveedor(proveedor_id):
+def eliminar_o_desactivar_proveedor(proveedor_id, forzar_completo=False):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT COUNT(*) FROM compras_proveedor WHERE proveedor_id = ?', (proveedor_id,))
     tiene_compras = cursor.fetchone()[0] > 0
-    if tiene_compras:
-        cursor.execute('UPDATE proveedores SET activo = 0 WHERE id = ?', (proveedor_id,))
-        accion = 'desactivado'
-    else:
+
+    if forzar_completo or not tiene_compras:
+        # Eliminar abonos y compras asociadas al proveedor para limpiar toda deuda
+        cursor.execute('DELETE FROM abonos_proveedor WHERE proveedor_id = ?', (proveedor_id,))
+        cursor.execute('DELETE FROM compras_proveedor WHERE proveedor_id = ?', (proveedor_id,))
+        # Desvincular prendas
+        cursor.execute('UPDATE prendas SET proveedor_id = NULL, compra_proveedor_id = NULL WHERE proveedor_id = ?', (proveedor_id,))
         cursor.execute('DELETE FROM proveedores WHERE id = ?', (proveedor_id,))
         accion = 'eliminado'
+    else:
+        cursor.execute('UPDATE proveedores SET activo = 0 WHERE id = ?', (proveedor_id,))
+        accion = 'desactivado'
     conn.commit()
     conn.close()
     return accion
+
+def eliminar_compra_proveedor(compra_id):
+    """
+    Elimina una factura/compra específica a proveedor y sus abonos directos,
+    desvinculando las prendas asociadas para evitar saldos pendientes huérfanos.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('DELETE FROM abonos_proveedor WHERE compra_id = ?', (compra_id,))
+        cursor.execute('UPDATE prendas SET compra_proveedor_id = NULL WHERE compra_proveedor_id = ?', (compra_id,))
+        cursor.execute('DELETE FROM compras_proveedor WHERE id = ?', (compra_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 # ================= COMPRAS Y FACTURAS DE PROVEEDORES =================
 
@@ -1132,29 +1166,61 @@ def get_dashboard_kpis():
         'alertas_stock': alertas_stock
     }
 
-# Funciones de Autenticación
-def verificar_usuario(username, password=None):
+# Funciones de Autenticación y Usuarios
+def verificar_usuario(username, password):
     """
-    Si se proporciona password se valida el hash;
-    si no se proporciona password o password='', permite acceso directo como solicitado.
+    Verifica credenciales de usuario con contraseña obligatoria.
     """
+    if not username or not password:
+        return None
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM usuarios WHERE username = ?', (username.strip().lower(),))
+    cursor.execute('SELECT * FROM usuarios WHERE LOWER(username) = ?', (username.strip().lower(),))
     user = cursor.fetchone()
     conn.close()
-    if not user:
-        # Fallback al admin principal
-        conn = get_db()
-        user = conn.execute('SELECT * FROM usuarios LIMIT 1').fetchone()
-        conn.close()
-        return dict(user) if user else None
 
-    if password is None or password == '':
-        return dict(user)
-    if check_password_hash(user['password_hash'], password):
+    if user and check_password_hash(user['password_hash'], password):
         return dict(user)
     return None
+
+def verificar_admin_password(password):
+    """
+    Verifica si una contraseña corresponde a un usuario con rol 'admin'.
+    Permite autorizar acciones críticas (anular ventas, purgar registros, etc.).
+    """
+    if not password:
+        return False
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT password_hash FROM usuarios WHERE rol = 'admin'")
+    admins = cursor.fetchall()
+    conn.close()
+
+    for adm in admins:
+        if check_password_hash(adm['password_hash'], password):
+            return True
+    return False
+
+def get_todos_usuarios():
+    conn = get_db()
+    rows = conn.execute('SELECT id, username, nombre, rol FROM usuarios ORDER BY id ASC').fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def crear_usuario(username, password, nombre, rol='cajero'):
+    conn = get_db()
+    cursor = conn.cursor()
+    p_hash = generate_password_hash(password)
+    cursor.execute(
+        'INSERT INTO usuarios (username, password_hash, nombre, rol) VALUES (?, ?, ?, ?)',
+        (username.strip().lower(), p_hash, nombre.strip(), rol)
+    )
+    new_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return new_id
 
 def cambiar_password(usuario_id, nueva_password):
     conn = get_db()

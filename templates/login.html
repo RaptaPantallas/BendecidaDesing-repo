@@ -109,32 +109,69 @@
 
       <form method="POST" action="{{ url_for('login') }}" class="login-form">
         <div class="form-group">
-          <label for="username">Usuario Administrador:</label>
-          <input 
-            type="text" 
-            id="username" 
-            name="username" 
-            class="form-control" 
-            placeholder="admin" 
-            value="admin"
-            required 
-            autofocus
-          >
-          <span class="form-helper" style="color: var(--accent-emerald);">Acceso directo sin contraseña activado</span>
+          <label for="username">Usuario:</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input 
+              type="text" 
+              id="username" 
+              name="username" 
+              class="form-control" 
+              placeholder="admin o vendedor" 
+              value="admin"
+              required 
+              autofocus
+              style="flex: 1;"
+            >
+            {% if usuarios %}
+            <select class="form-select" style="max-width: 130px; font-size: 0.8rem;" onchange="document.getElementById('username').value = this.value">
+              <option value="">Elegir...</option>
+              {% for u in usuarios %}
+                <option value="{{ u.username }}">{{ u.username }} ({{ u.rol }})</option>
+              {% endfor %}
+            </select>
+            {% endif %}
+          </div>
         </div>
 
-        <!-- Campo de contraseña opcional o invisible -->
-        <input type="hidden" name="password" value="">
+        <div class="form-group">
+          <label for="password">Contraseña de Acceso:</label>
+          <div style="position: relative;">
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              class="form-control" 
+              placeholder="Ingrese su contraseña..." 
+              required
+              style="padding-right: 2.75rem;"
+            >
+            <button 
+              type="button" 
+              onclick="togglePassword()" 
+              style="position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--text-muted); padding: 0.25rem;"
+              title="Mostrar u ocultar contraseña"
+            >
+              👁️
+            </button>
+          </div>
+        </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.95rem; font-size: 1.05rem; margin-top: 0.5rem; font-weight: bold; border-radius: var(--radius-md); box-shadow: var(--shadow-md);">
-          ✨ Entrar al Sistema (1 Clic)
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.85rem; font-size: 1.05rem; margin-top: 0.5rem; font-weight: bold; border-radius: var(--radius-md); box-shadow: var(--shadow-md);">
+          🔐 Iniciar Sesión
         </button>
       </form>
 
-      <!-- Mensaje informativo -->
-      <div class="credentials-hint">
-        <strong style="color: var(--primary-dark);">✨ Modo Rápido Activado:</strong><br>
-        Puede ingresar directamente presionando el botón sin necesidad de escribir contraseñas.
+      <!-- Ayuda de usuarios del sistema -->
+      <div class="credentials-hint" style="text-align: left;">
+        <strong style="color: var(--primary-dark); display: block; margin-bottom: 0.35rem;">👥 Usuarios disponibles:</strong>
+        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.2rem;">
+          <span>• <strong>admin</strong> (Acceso total & autorizaciones)</span>
+          <span style="color: var(--text-muted); font-family: monospace;">bendecida2026</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+          <span>• <strong>vendedor</strong> (POS & Caja)</span>
+          <span style="color: var(--text-muted); font-family: monospace;">1234</span>
+        </div>
       </div>
 
     </div>

@@ -56,6 +56,7 @@ def inject_global_data():
         'ultima_actualizacion_bcv': config.get('ultima_actualizacion_bcv', ''),
         'current_user': session.get('user_name', 'Administrador'),
         'username': session.get('username', 'admin'),
+        'user_rol': session.get('rol', 'admin'),
         'anio_actual': datetime.now().year
     }
 
@@ -67,28 +68,47 @@ def login():
         return redirect(url_for('dashboard'))
 
     error = None
+    usuarios = db.get_todos_usuarios()
     if request.method == 'POST':
-        # Permitir login sin requerir contraseña
-        username = request.form.get('username', 'admin').strip() or 'admin'
-        password = request.form.get('password', '')
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
 
-        user = db.verificar_usuario(username, password)
-        if user:
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            session['user_name'] = user['nombre']
-            session['rol'] = user['rol']
-            next_page = request.args.get('next')
-            return redirect(next_page or url_for('dashboard'))
+        if not username or not password:
+            error = 'Por favor ingrese tanto el usuario como la contraseña.'
         else:
-            error = 'No se pudo iniciar sesión. Verifique el usuario.'
+            user = db.verificar_usuario(username, password)
+            if user:
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                session['user_name'] = user['nombre']
+                session['rol'] = user['rol']
+                next_page = request.args.get('next')
+                return redirect(next_page or url_for('dashboard'))
+            else:
+                error = 'Usuario o contraseña incorrectos. Verifique sus datos.'
 
-    return render_template('login.html', error=error)
+    return render_template('login.html', error=error, usuarios=usuarios)
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+@app.route('/api/auth/verificar_admin', methods=['POST'])
+def api_verificar_admin():
+    """Valida la contraseña de administrador para autorizar operaciones críticas"""
+    try:
+        data = request.get_json() or request.form
+        admin_password = data.get('password', '').strip()
+        if not admin_password:
+            return jsonify({'success': False, 'message': 'Debe ingresar la contraseña de administrador'}), 400
+        
+        if db.verificar_admin_password(admin_password):
+            return jsonify({'success': True, 'message': 'Autorización concedida'})
+        else:
+            return jsonify({'success': False, 'message': 'Contraseña de administrador incorrecta'}), 403
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 # ================= RUTAS DE VISTAS =================
 
@@ -355,14 +375,25 @@ def api_crear_venta():
 @app.route('/api/ventas/<int:venta_id>/anular', methods=['POST'])
 def api_anular_venta(venta_id):
     try:
+        data = request.get_json() or request.form
+        admin_password = data.get('admin_password', '').strip()
+        # Si el usuario logueado no es admin o si se solicita autorización estricta
+        if not admin_password or not db.verificar_admin_password(admin_password):
+            return jsonify({'success': False, 'message': 'Autorización denegada: Contraseña de Administrador incorrecta o no suministrada'}), 403
+
         db.anular_venta(venta_id)
-        return jsonify({'success': True, 'message': 'Venta anulada y prendas devueltas al inventario con éxito'})
+        return jsonify({'success': True, 'message': 'Venta autorizada y anulada con éxito. Prendas devueltas al inventario.'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/ventas/<int:venta_id>/eliminar_definitiva', methods=['POST'])
 def api_eliminar_venta_definitiva(venta_id):
     try:
+        data = request.get_json() or request.form
+        admin_password = data.get('admin_password', '').strip()
+        if not admin_password or not db.verificar_admin_password(admin_password):
+            return jsonify({'success': False, 'message': 'Autorización denegada: Contraseña de Administrador incorrecta o requerida'}), 403
+
         db.eliminar_venta_definitiva(venta_id)
         return jsonify({'success': True, 'message': 'Venta anulada eliminada definitivamente del sistema'})
     except Exception as e:
@@ -371,8 +402,13 @@ def api_eliminar_venta_definitiva(venta_id):
 @app.route('/api/ventas/purgar_anuladas', methods=['POST'])
 def api_purgar_ventas_anuladas():
     try:
+        data = request.get_json() or request.form
+        admin_password = data.get('admin_password', '').strip()
+        if not admin_password or not db.verificar_admin_password(admin_password):
+            return jsonify({'success': False, 'message': 'Autorización requerida: Ingrese contraseña de Administrador'}), 403
+
         total = db.purgar_ventas_anuladas()
-        return jsonify({'success': True, 'message': f'Se han eliminado definitivamente {total} ventas anuladas. El historial solo contiene ventas reales.'})
+        return jsonify({'success': True, 'message': f'Se han purgado {total} ventas anuladas. El historial está limpio.'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
@@ -415,9 +451,29 @@ def api_editar_proveedor(proveedor_id):
 @app.route('/api/proveedores/<int:proveedor_id>/eliminar', methods=['POST'])
 def api_eliminar_proveedor(proveedor_id):
     try:
-        accion = db.eliminar_o_desactivar_proveedor(proveedor_id)
-        msg = 'Proveedor eliminado' if accion == 'eliminado' else 'Proveedor desactivado (tenía compras registradas)'
+        data = request.get_json() or request.form
+        admin_password = data.get('admin_password', '').strip()
+        forzar_completo = data.get('forzar_completo', True)  # Limpiar deudas asociadas para no dejar deuda huérfana
+        
+        if not admin_password or not db.verificar_admin_password(admin_password):
+            return jsonify({'success': False, 'message': 'Autorización denegada: Ingrese la contraseña de Administrador'}), 403
+
+        accion = db.eliminar_o_desactivar_proveedor(proveedor_id, forzar_completo=forzar_completo)
+        msg = 'Proveedor y sus cuentas asociadas eliminados correctamente' if accion == 'eliminado' else 'Proveedor desactivado'
         return jsonify({'success': True, 'message': msg})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/proveedores/compras/<int:compra_id>/eliminar', methods=['POST'])
+def api_eliminar_compra_proveedor(compra_id):
+    try:
+        data = request.get_json() or request.form
+        admin_password = data.get('admin_password', '').strip()
+        if not admin_password or not db.verificar_admin_password(admin_password):
+            return jsonify({'success': False, 'message': 'Autorización denegada: Ingrese la contraseña de Administrador'}), 403
+
+        db.eliminar_compra_proveedor(compra_id)
+        return jsonify({'success': True, 'message': 'Factura de compra y su saldo pendiente eliminados con éxito'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 

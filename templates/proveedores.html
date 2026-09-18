@@ -212,17 +212,26 @@
               {% endif %}
             </td>
             <td style="text-align: center;">
-              {% if c.saldo_pendiente_usd > 0.01 %}
+              <div style="display: flex; gap: 0.35rem; justify-content: center; align-items: center;">
+                {% if c.saldo_pendiente_usd > 0.01 %}
+                  <button 
+                    class="btn btn-secondary btn-sm" 
+                    title="Abonar a esta factura"
+                    onclick="abrirModalAbonoDirectoFactura({{ c.proveedor_id }}, {{ c.id }}, '{{ c.numero_factura }}', {{ c.saldo_pendiente_usd }})"
+                  >
+                    💵 Abonar
+                  </button>
+                {% else %}
+                  <span style="color: var(--text-muted); font-size: 0.8rem;">✓ Solvente</span>
+                {% endif %}
                 <button 
-                  class="btn btn-secondary btn-sm" 
-                  title="Abonar a esta factura"
-                  onclick="abrirModalAbonoDirectoFactura({{ c.proveedor_id }}, {{ c.id }}, '{{ c.numero_factura }}', {{ c.saldo_pendiente_usd }})"
+                  class="btn btn-rose btn-icon-only btn-sm" 
+                  title="Eliminar factura y deuda asociada"
+                  onclick="confirmarEliminarFacturaCompra({{ c.id }}, '{{ c.numero_factura }}')"
                 >
-                  💵 Abonar
+                  🗑️
                 </button>
-              {% else %}
-                <span style="color: var(--text-muted); font-size: 0.8rem;">✓ Solventada</span>
-              {% endif %}
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -561,20 +570,52 @@
     }
   }
 
-  async function confirmarEliminarProveedor(id, nombre) {
-    if (!confirm(`¿Eliminar o desactivar al proveedor ${nombre}?`)) return;
-    try {
-      const res = await fetch(`/api/proveedores/${id}/eliminar`, { method: 'POST' });
-      const resp = await res.json();
-      if (resp.success) {
-        showToast(resp.message, 'success');
-        setTimeout(() => window.location.reload(), 500);
-      } else {
-        showToast(resp.message || 'Error al eliminar', 'error');
+  function confirmarEliminarProveedor(id, nombre) {
+    solicitarAutorizacionAdmin(
+      `Autorización requerida para ELIMINAR al proveedor "${nombre}" y limpiar sus cuentas por pagar asociadas.`,
+      async (adminPassword) => {
+        try {
+          const res = await fetch(`/api/proveedores/${id}/eliminar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ admin_password: adminPassword, forzar_completo: true })
+          });
+          const resp = await res.json();
+          if (resp.success) {
+            showToast(resp.message, 'success');
+            setTimeout(() => window.location.reload(), 500);
+          } else {
+            showToast(resp.message || 'Error al eliminar proveedor', 'error');
+          }
+        } catch (err) {
+          showToast('Error de conexión con el servidor', 'error');
+        }
       }
-    } catch (err) {
-      showToast('Error de conexión', 'error');
-    }
+    );
+  }
+
+  function confirmarEliminarFacturaCompra(compraId, nroFactura) {
+    solicitarAutorizacionAdmin(
+      `Autorización para ELIMINAR la factura de compra #${nroFactura} y su saldo deudor pendiente.`,
+      async (adminPassword) => {
+        try {
+          const res = await fetch(`/api/proveedores/compras/${compraId}/eliminar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ admin_password: adminPassword })
+          });
+          const resp = await res.json();
+          if (resp.success) {
+            showToast(resp.message, 'success');
+            setTimeout(() => window.location.reload(), 500);
+          } else {
+            showToast(resp.message || 'Error al eliminar factura', 'error');
+          }
+        } catch (err) {
+          showToast('Error de conexión', 'error');
+        }
+      }
+    );
   }
 
   // Compras y Mercancía

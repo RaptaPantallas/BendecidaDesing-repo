@@ -79,6 +79,7 @@
           <span class="badge badge-gray" style="font-size: 0.82rem; padding: 0.35rem 0.65rem;">{{ cat }}</span>
         {% endfor %}
       </div>
+    </div>
 
     <!-- Cambio de Contraseña de Acceso -->
     <div class="card">
@@ -86,7 +87,7 @@
         <span>🔐</span> Cambiar Contraseña
       </h3>
       <p style="color: var(--text-muted); font-size: 0.82rem; margin-bottom: 1rem;">
-        Usuario activo: <strong>{{ username }}</strong>
+        Usuario activo: <strong>{{ username }}</strong> (Rol: <strong>{{ user_rol }}</strong>)
       </p>
 
       <form id="form-cambio-clave" onsubmit="cambiarContrasenaSubmit(event)">
@@ -139,7 +140,7 @@
   async function agregarNuevaCategoria(e) {
     e.preventDefault();
     const input = document.getElementById('nueva-cat-input');
-    const nombre = input.value.trim();
+    const nombre = input ? input.value.trim() : '';
     if (!nombre) return;
 
     try {
@@ -155,6 +156,11 @@
       } else {
         showToast(resp.message || 'Error al crear', 'error');
       }
+    } catch (err) {
+      showToast('Error de conexión', 'error');
+    }
+  }
+
   async function cambiarContrasenaSubmit(e) {
     e.preventDefault();
     const actual = document.getElementById('clave-actual').value;

@@ -290,25 +290,92 @@ async function submitPrendaForm(e) {
   }
 }
 
-// Anular venta desde la vista de ventas
-async function anularVenta(ventaId, numeroRecibo) {
-  if (!confirm(`¿Está seguro de ANULAR la venta ${numeroRecibo}? Las prendas serán devueltas al inventario.`)) return;
+// ================= AUTORIZACIÓN ADMINISTRATIVA =================
+let accionPendienteAdmin = null;
 
+function solicitarAutorizacionAdmin(descripcion, accionCallback) {
+  accionPendienteAdmin = accionCallback;
+  const descEl = document.getElementById('modal-auth-admin-desc');
+  const passInput = document.getElementById('input-auth-admin-pass');
+  if (descEl) descEl.textContent = descripcion || 'Esta acción crítica requiere la contraseña de un Administrador.';
+  if (passInput) passInput.value = '';
+  openModal('modal-auth-admin');
+  setTimeout(() => {
+    if (passInput) passInput.focus();
+  }, 100);
+}
+
+function cerrarModalAuthAdmin() {
+  accionPendienteAdmin = null;
+  closeModal('modal-auth-admin');
+}
+
+function toggleAuthAdminPass() {
+  const input = document.getElementById('input-auth-admin-pass');
+  if (!input) return;
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+async function ejecutarAccionAutorizadaAdmin(e) {
+  e.preventDefault();
+  const passInput = document.getElementById('input-auth-admin-pass');
+  const password = passInput ? passInput.value.trim() : '';
+  if (!password) {
+    showToast('Ingrese la contraseña de administrador', 'error');
+    return;
+  }
+
+  // Verificar primero si la contraseña es válida
   try {
-    const res = await fetch(`/api/ventas/${ventaId}/anular`, {
+    const res = await fetch('/api/auth/verificar_admin', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: password })
     });
     const data = await res.json();
-    if (data.success) {
-      showToast(data.message, 'success');
-      setTimeout(() => window.location.reload(), 600);
-    } else {
-      showToast(data.message || 'Error al anular venta', 'error');
+    if (!data.success) {
+      showToast(data.message || 'Contraseña de Administrador incorrecta', 'error');
+      if (passInput) {
+        passInput.select();
+        passInput.focus();
+      }
+      return;
+    }
+
+    // Contraseña válida: ejecutar la acción protegida
+    const cb = accionPendienteAdmin;
+    cerrarModalAuthAdmin();
+    if (typeof cb === 'function') {
+      await cb(password);
     }
   } catch (err) {
-    showToast('Error al comunicarse con el servidor', 'error');
+    showToast('Error de comunicación con el servidor', 'error');
   }
+}
+
+// Anular venta desde la vista de ventas con autorización de administrador
+function anularVenta(ventaId, numeroRecibo) {
+  solicitarAutorizacionAdmin(
+    `Autorización para ANULAR la venta ${numeroRecibo}. Las prendas se reintegrarán al stock activo.`,
+    async (adminPassword) => {
+      try {
+        const res = await fetch(`/api/ventas/${ventaId}/anular`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ admin_password: adminPassword })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          setTimeout(() => window.location.reload(), 600);
+        } else {
+          showToast(data.message || 'Error al anular venta', 'error');
+        }
+      } catch (err) {
+        showToast('Error al comunicarse con el servidor', 'error');
+      }
+    }
+  );
 }
 
 // Ver detalle de venta en modal
@@ -348,47 +415,55 @@ async function verDetalleVenta(ventaId) {
   }
 }
 
-// Eliminar venta definitivamente (para ventas anuladas)
-async function eliminarVentaDefinitiva(ventaId, numeroRecibo) {
-  if (!confirm(`¿Está completamente seguro de ELIMINAR DEFINITIVAMENTE la venta anulada ${numeroRecibo}? Esta acción no se puede deshacer y borrará todo rastro del historial.`)) return;
-
-  try {
-    const res = await fetch(`/api/ventas/${ventaId}/eliminar_definitiva`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(data.message, 'success');
-      setTimeout(() => window.location.reload(), 600);
-    } else {
-      showToast(data.message || 'Error al eliminar', 'error');
+// Eliminar venta definitivamente (para ventas anuladas) con autorización
+function eliminarVentaDefinitiva(ventaId, numeroRecibo) {
+  solicitarAutorizacionAdmin(
+    `Autorización para BORRAR DEFINITIVAMENTE la venta anulada ${numeroRecibo}. Esta acción no se puede deshacer.`,
+    async (adminPassword) => {
+      try {
+        const res = await fetch(`/api/ventas/${ventaId}/eliminar_definitiva`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ admin_password: adminPassword })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          setTimeout(() => window.location.reload(), 600);
+        } else {
+          showToast(data.message || 'Error al eliminar', 'error');
+        }
+      } catch (err) {
+        showToast('Error al procesar la solicitud', 'error');
+      }
     }
-  } catch (err) {
-    showToast('Error al procesar la solicitud', 'error');
-  }
+  );
 }
 
-// Purgar todas las ventas anuladas del sistema
-async function purgarTodasVentasAnuladas() {
-  if (!confirm('¿Desea BORRAR DEFINITIVAMENTE TODAS las ventas anuladas? El historial quedará purgado únicamente con las ventas reales y válidas.')) return;
-
-  try {
-    const res = await fetch('/api/ventas/purgar_anuladas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(data.message, 'success');
-      setTimeout(() => {
-        window.location.href = '/ventas';
-      }, 700);
-    } else {
-      showToast(data.message || 'Error al purgar', 'error');
+// Purgar todas las ventas anuladas del sistema con autorización
+function purgarTodasVentasAnuladas() {
+  solicitarAutorizacionAdmin(
+    'Autorización para BORRAR TODAS las ventas anuladas registradas en el sistema.',
+    async (adminPassword) => {
+      try {
+        const res = await fetch('/api/ventas/purgar_anuladas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ admin_password: adminPassword })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message, 'success');
+          setTimeout(() => {
+            window.location.href = '/ventas';
+          }, 700);
+        } else {
+          showToast(data.message || 'Error al purgar', 'error');
+        }
+      } catch (err) {
+        showToast('Error al conectar con el servidor', 'error');
+      }
     }
-  } catch (err) {
-    showToast('Error al conectar con el servidor', 'error');
-  }
+  );
 }
 

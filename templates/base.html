@@ -154,7 +154,52 @@
     </div>
   </div>
 
-  <!-- Barra de Navegación Móvil Inferior Fija (Solo en celulares) -->
+  <!-- Modal Global: Autorización de Administrador -->
+  <div id="modal-auth-admin" class="modal-overlay">
+    <div class="modal-box" style="max-width: 440px;">
+      <div class="modal-header" style="border-bottom: 2px solid var(--accent-rose);">
+        <h3 class="modal-title" style="color: var(--accent-rose); display: flex; align-items: center; gap: 0.5rem;">
+          <span>🔒</span> Autorización Requerida
+        </h3>
+        <button class="modal-close" onclick="cerrarModalAuthAdmin()">&times;</button>
+      </div>
+      <form id="form-auth-admin" onsubmit="ejecutarAccionAutorizadaAdmin(event)">
+        <div class="modal-body">
+          <p id="modal-auth-admin-desc" style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+            Esta operación crítica requiere autorización de un Administrador.
+          </p>
+          <div class="form-group">
+            <label for="input-auth-admin-pass">Contraseña de Administrador *</label>
+            <div style="position: relative;">
+              <input 
+                type="password" 
+                id="input-auth-admin-pass" 
+                class="form-control" 
+                placeholder="Ingrese la contraseña de admin..." 
+                required
+                autocomplete="current-password"
+                style="padding-right: 2.75rem;"
+              >
+              <button 
+                type="button" 
+                onclick="toggleAuthAdminPass()" 
+                style="position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; color: var(--text-muted);"
+              >
+                👁️
+              </button>
+            </div>
+            <span class="form-helper" style="color: var(--text-muted);">Solo el administrador puede aprobar esta eliminación o anulación.</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="cerrarModalAuthAdmin()">Cancelar</button>
+          <button type="submit" class="btn btn-rose" id="btn-submit-auth-admin">
+            <span>🛡️</span> Autorizar y Continuar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
   <nav class="mobile-bottom-bar">
     <a href="{{ url_for('dashboard') }}" class="mobile-nav-item {% if active_page == 'dashboard' %}active{% endif %}">
       <span class="nav-icon">📊</span>
