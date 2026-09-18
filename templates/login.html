@@ -76,16 +76,6 @@
       text-align: center;
       font-weight: 600;
     }
-    .credentials-hint {
-      margin-top: 1.5rem;
-      padding-top: 1.25rem;
-      border-top: 1px dashed var(--border-subtle);
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      background: #fff8fa;
-      border-radius: var(--radius-sm);
-      padding: 0.75rem;
-    }
   </style>
 </head>
 <body>
@@ -110,27 +100,15 @@
       <form method="POST" action="{{ url_for('login') }}" class="login-form">
         <div class="form-group">
           <label for="username">Usuario:</label>
-          <div style="display: flex; gap: 0.5rem;">
-            <input 
-              type="text" 
-              id="username" 
-              name="username" 
-              class="form-control" 
-              placeholder="admin o vendedor" 
-              value="admin"
-              required 
-              autofocus
-              style="flex: 1;"
-            >
-            {% if usuarios %}
-            <select class="form-select" style="max-width: 130px; font-size: 0.8rem;" onchange="document.getElementById('username').value = this.value">
-              <option value="">Elegir...</option>
-              {% for u in usuarios %}
-                <option value="{{ u.username }}">{{ u.username }} ({{ u.rol }})</option>
-              {% endfor %}
-            </select>
-            {% endif %}
-          </div>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            class="form-control" 
+            placeholder="Ingrese su usuario..." 
+            required 
+            autofocus
+          >
         </div>
 
         <div class="form-group">
@@ -160,19 +138,6 @@
           🔐 Iniciar Sesión
         </button>
       </form>
-
-      <!-- Ayuda de usuarios del sistema -->
-      <div class="credentials-hint" style="text-align: left;">
-        <strong style="color: var(--primary-dark); display: block; margin-bottom: 0.35rem;">👥 Usuarios disponibles:</strong>
-        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.2rem;">
-          <span>• <strong>admin</strong> (Acceso total & autorizaciones)</span>
-          <span style="color: var(--text-muted); font-family: monospace;">bendecida2026</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
-          <span>• <strong>vendedor</strong> (POS & Caja)</span>
-          <span style="color: var(--text-muted); font-family: monospace;">1234</span>
-        </div>
-      </div>
 
     </div>
   </div>
