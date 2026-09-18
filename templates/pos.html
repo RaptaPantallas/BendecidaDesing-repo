@@ -3,14 +3,14 @@
 {% block title %}Punto de Venta (POS){% endblock %}
 
 {% block content %}
-<div class="page-header" style="margin-bottom: 1rem;">
+<div class="page-header pos-page-header" style="margin-bottom: 0.75rem;">
   <div class="page-title-group">
     <h2>Terminal de Venta y Salidas</h2>
-    <p>Seleccione prendas para cobrar rápidamente en dólares o bolívares</p>
+    <p class="pos-page-sub">Seleccione prendas para cobrar rápidamente en dólares o bolívares</p>
   </div>
   <div class="header-actions">
-    <button class="btn btn-secondary btn-sm" onclick="clearCart()">
-      <span>🗑️</span> Vaciar Carrito
+    <button class="btn btn-secondary btn-sm pos-header-clear-btn" onclick="clearCart()">
+      <span>🗑️</span> <span class="btn-text">Vaciar Carrito</span>
     </button>
   </div>
 </div>
@@ -94,14 +94,17 @@
 
   </div>
 
-  <!-- Panel del Carrito / Cuenta (Columna Derecha) -->
+  <!-- Panel del Carrito / Cuenta (Columna Derecha / Bottom Drawer en Móvil) -->
   <div class="pos-cart-panel" id="pos-cart-panel">
     
     <div class="pos-cart-header">
-      <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+      <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; margin: 0;">
         <span>🛒</span> Cuenta Actual
       </h3>
-      <span class="badge badge-emerald" id="pos-cart-count">0 piezas</span>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span class="badge badge-emerald" id="pos-cart-count">0 piezas</span>
+        <button type="button" class="pos-cart-close-mobile" onclick="cerrarCarritoMovil()" title="Cerrar carrito">&times;</button>
+      </div>
     </div>
 
     <!-- Lista de items en el carrito -->
@@ -138,6 +141,9 @@
   </div>
 
 </div>
+
+<!-- Backdrop para cerrar carrito en móvil al tocar afuera -->
+<div class="pos-cart-backdrop" id="pos-cart-backdrop" onclick="cerrarCarritoMovil()"></div>
 
 <!-- Botón Flotante de Carrito para Celulares (Mobile) -->
 <div class="mobile-cart-float-bar" id="mobile-cart-float-bar" onclick="mostrarCarritoMovil()">

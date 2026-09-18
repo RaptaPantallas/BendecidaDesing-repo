@@ -1207,24 +1207,80 @@ h1, h2, h3, h4 {
 .mobile-cart-float-bar {
   display: none;
   position: fixed;
-  bottom: 72px;
-  left: 1rem;
-  right: 1rem;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  left: 0.75rem;
+  right: 0.75rem;
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: #ffffff;
-  border-radius: var(--radius-md);
-  padding: 0.85rem 1.15rem;
-  box-shadow: 0 8px 25px rgba(212, 93, 130, 0.35);
+  border-radius: var(--radius-full);
+  padding: 0.75rem 1.15rem;
+  box-shadow: 0 8px 25px rgba(212, 93, 130, 0.45);
   z-index: 1400;
   justify-content: space-between;
   align-items: center;
   font-weight: 700;
   cursor: pointer;
   animation: slideIn 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .mobile-cart-float-bar span {
-  font-size: 1rem;
+  font-size: 0.95rem;
+}
+
+/* Botón cerrar y backdrop para Drawer de Carrito en Móvil */
+.pos-cart-close-mobile {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.pos-cart-close-mobile:hover {
+  color: var(--primary);
+  background: rgba(212, 93, 130, 0.1);
+}
+
+.pos-cart-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(30, 15, 25, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1800;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.pos-cart-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Acciones en Navbar */
+.nav-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.nav-logout-btn {
+  border-radius: var(--radius-full);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 /* Responsive Breakpoints y Adaptaciones Móviles */
@@ -1232,33 +1288,238 @@ h1, h2, h3, h4 {
   .pos-container {
     grid-template-columns: 1fr;
   }
-  .pos-cart-panel {
-    position: static;
-    min-height: auto;
-  }
 }
 
 @media (max-width: 768px) {
   body {
-    padding-bottom: 70px;
+    padding-bottom: 74px;
+  }
+
+  .main-wrapper {
+    padding: 0.85rem 0.75rem 5rem;
+  }
+
+  /* Header & Navbar Móvil Optimizado */
+  .navbar {
+    box-shadow: 0 2px 12px rgba(212, 93, 130, 0.08);
   }
 
   .nav-container {
-    padding: 0.6rem 1rem;
+    padding: 0.45rem 0.75rem;
+    gap: 0.5rem;
   }
 
   .nav-links {
     display: none;
   }
 
-  .mobile-bottom-bar {
-    display: flex;
+  .brand-section {
+    gap: 0.55rem;
+    min-width: 0;
   }
 
+  .brand-logo-frame {
+    width: 36px;
+    height: 36px;
+    border-width: 1.5px;
+  }
+
+  .brand-name-title {
+    font-size: 1.05rem;
+    white-space: nowrap;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+
+  .nav-right-actions {
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .rate-widget-pill {
+    padding: 0.3rem 0.55rem;
+    gap: 0.35rem;
+  }
+
+  .rate-flag {
+    font-size: 0.95rem;
+  }
+
+  .rate-label {
+    display: none;
+  }
+
+  .rate-val {
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .rate-edit-icon {
+    font-size: 0.7rem;
+  }
+
+  .nav-logout-btn {
+    padding: 0.32rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .logout-text {
+    display: none !important;
+  }
+
+  /* Barra de Navegación Inferior Fija */
+  .mobile-bottom-bar {
+    display: flex;
+    height: 56px;
+    padding: 0.25rem 0.2rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Encabezado POS Compacto */
+  .pos-page-header {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 0.65rem !important;
+  }
+
+  .pos-page-header .page-title-group h2 {
+    font-size: 1.15rem;
+    margin: 0;
+  }
+
+  .pos-page-sub {
+    display: none;
+  }
+
+  .pos-page-header .header-actions {
+    width: auto !important;
+  }
+
+  .pos-header-clear-btn {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.75rem;
+  }
+
+  .pos-header-clear-btn .btn-text {
+    display: none;
+  }
+
+  /* Catálogo POS en Pantallas Móviles */
+  .pos-catalog {
+    gap: 0.65rem;
+  }
+
+  .search-input-wrap input {
+    padding: 0.6rem 0.75rem 0.6rem 2.25rem;
+    font-size: 0.88rem !important;
+  }
+
+  .cat-pill {
+    padding: 0.32rem 0.75rem !important;
+    font-size: 0.78rem !important;
+    white-space: nowrap;
+  }
+
+  .pos-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.6rem !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    padding-right: 0 !important;
+    padding-bottom: 3.5rem;
+  }
+
+  .pos-card {
+    padding: 0.55rem;
+    border-radius: 10px;
+    min-width: 0;
+  }
+
+  .pos-card-img-wrap {
+    height: 105px;
+    margin-bottom: 0.4rem;
+    border-radius: 6px;
+  }
+
+  .pos-card-title {
+    font-size: 0.82rem;
+    margin: 0.15rem 0;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .pos-card-code {
+    font-size: 0.65rem;
+  }
+
+  .pos-card-meta {
+    gap: 0.25rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .badge-pill-talla {
+    font-size: 0.62rem;
+    padding: 0.1rem 0.35rem;
+  }
+
+  .pos-card-pricing {
+    padding-top: 0.35rem;
+  }
+
+  .pos-price-usd {
+    font-size: 0.98rem;
+  }
+
+  .pos-price-bs {
+    font-size: 0.72rem;
+  }
+
+  /* Bottom Drawer para el Carrito en Móvil */
+  .pos-cart-panel {
+    position: fixed;
+    bottom: -110%;
+    left: 0;
+    right: 0;
+    z-index: 1900;
+    min-height: auto;
+    max-height: 84vh;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
+    transition: bottom 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    background: #ffffff;
+    padding: 1.15rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pos-cart-panel.mobile-open {
+    bottom: 0;
+  }
+
+  .pos-cart-close-mobile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pos-cart-backdrop {
+    display: block;
+  }
+
+  .pos-cart-items {
+    max-height: 42vh;
+    padding-right: 0.2rem;
+  }
+
+  /* Botón Flotante del Carrito */
   .mobile-cart-float-bar {
     display: flex;
   }
 
+  /* Formularios y Modales */
   .form-control, .form-select {
     font-size: 16px !important;
   }
@@ -1291,11 +1552,6 @@ h1, h2, h3, h4 {
     font-size: 1.4rem;
   }
 
-  .pos-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-  }
-
   .modal-box {
     margin: 0.5rem;
     max-height: 94vh;
@@ -1323,14 +1579,14 @@ h1, h2, h3, h4 {
 }
 
 .mobile-nav-item {
-  min-width: 52px;
-  padding: 0.35rem 0.2rem;
-  font-size: 0.68rem;
+  min-width: 48px;
+  padding: 0.25rem 0.2rem;
+  font-size: 0.65rem;
 }
 
 .mobile-nav-item .nav-icon {
   font-size: 1.15rem;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 
 @media (max-width: 480px) {
@@ -1339,7 +1595,16 @@ h1, h2, h3, h4 {
   }
 
   .pos-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  .brand-name-title {
+    font-size: 0.98rem;
+  }
+
+  .pos-card-img-wrap {
+    height: 92px;
   }
 }
 

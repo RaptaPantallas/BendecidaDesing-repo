@@ -148,11 +148,24 @@ function updateTotals(totalUsd) {
   }
 }
 
-// Desplazar suavemente hacia el carrito en teléfonos móviles
+// Control del Carrito en dispositivos móviles (Bottom Drawer / Modal)
 function mostrarCarritoMovil() {
   const panel = document.getElementById('pos-cart-panel');
+  const backdrop = document.getElementById('pos-cart-backdrop');
   if (panel) {
-    panel.scrollIntoView({ behavior: 'smooth' });
+    panel.classList.add('mobile-open');
+    if (backdrop) backdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function cerrarCarritoMovil() {
+  const panel = document.getElementById('pos-cart-panel');
+  const backdrop = document.getElementById('pos-cart-backdrop');
+  if (panel) {
+    panel.classList.remove('mobile-open');
+    if (backdrop) backdrop.classList.remove('active');
+    document.body.style.overflow = '';
   }
 }
 
@@ -191,6 +204,8 @@ function abrirModalCobro() {
     showToast('El carrito está vacío', 'warning');
     return;
   }
+
+  cerrarCarritoMovil();
 
   const totalUsd = cart.reduce((sum, item) => sum + (item.cantidad * item.precio_usd), 0);
   const totalBs = totalUsd * CURRENT_TASA;
