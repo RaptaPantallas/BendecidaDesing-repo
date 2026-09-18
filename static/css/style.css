@@ -1302,6 +1302,37 @@ h1, h2, h3, h4 {
   }
 }
 
+/* Pestañas de la sección de proveedores */
+.prov-tab-btn {
+  border-radius: var(--radius-full) !important;
+  padding: 0.45rem 1rem !important;
+  font-size: 0.85rem !important;
+  white-space: nowrap;
+}
+
+.prov-tab-btn.active {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.mobile-bottom-bar {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-nav-item {
+  min-width: 52px;
+  padding: 0.35rem 0.2rem;
+  font-size: 0.68rem;
+}
+
+.mobile-nav-item .nav-icon {
+  font-size: 1.15rem;
+  margin-bottom: 2px;
+}
+
 @media (max-width: 480px) {
   .kpi-grid {
     grid-template-columns: 1fr;
@@ -1311,3 +1342,4 @@ h1, h2, h3, h4 {
     grid-template-columns: 1fr 1fr;
   }
 }
+

@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Estadísticas Financieras & Ganancias{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h2>Estadísticas Financieras & Rentabilidad</h2>
+    <p>Resumen analítico de ingresos reales, costo de mercancía, ganancias netas y estado de cuentas</p>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('exportar_ventas_csv') }}" class="btn btn-emerald btn-sm">
+      <span>📥</span> Exportar Ventas a Excel
+    </a>
+  </div>
+</div>
+
+<!-- Métricas Financieras Principales: Costo, Ganancia Neta, Ventas Reales -->
+<div class="kpi-grid">
+  
+  <!-- Ingresos Totales por Ventas Reales -->
+  <div class="kpi-card emerald">
+    <div class="kpi-header">
+      <span class="kpi-title">Ingresos Ventas Reales</span>
+      <span class="kpi-icon">💵</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val">${{ "%.2f"|format(stats.total_ventas_usd) }}</div>
+      <div class="kpi-sub-val">{{ "%.2f"|format(stats.total_ventas_bs) }} Bs.</div>
+    </div>
+    <div class="kpi-foot">
+      <span>{{ stats.cant_ventas_reales }} ventas válidas completadas</span>
+    </div>
+  </div>
+
+  <!-- Costo de la Mercancía Vendida (COGS) -->
+  <div class="kpi-card blue">
+    <div class="kpi-header">
+      <span class="kpi-title">Costo de Mercancía Vendida</span>
+      <span class="kpi-icon">📦</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val">${{ "%.2f"|format(stats.costo_mercancia_vendida_usd) }}</div>
+      <div class="kpi-sub-val">{{ "%.2f"|format(stats.costo_mercancia_vendida_usd * tasa) }} Bs.</div>
+    </div>
+    <div class="kpi-foot">
+      <span>Costo de compra en divisas a proveedores</span>
+    </div>
+  </div>
+
+  <!-- Ganancia Neta Real (Utilidad) -->
+  <div class="kpi-card" style="border-color: rgba(207, 162, 54, 0.4); background: linear-gradient(180deg, rgba(207, 162, 54, 0.08) 0%, var(--bg-surface) 100%);">
+    <div class="kpi-header">
+      <span class="kpi-title" style="color: var(--gold-dark); font-weight: bold;">Ganancia Neta Real</span>
+      <span class="kpi-icon">✨</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val" style="color: var(--gold-dark); font-weight: 800;">${{ "%.2f"|format(stats.ganancia_neta_usd) }}</div>
+      <div class="kpi-sub-val" style="color: var(--gold-dark); font-weight: 600;">{{ "%.2f"|format(stats.ganancia_neta_bs) }} Bs.</div>
+    </div>
+    <div class="kpi-foot">
+      <span style="font-weight: 600; color: var(--accent-emerald);">Margen promedio: {{ stats.margen_ganancia_pct }}%</span>
+    </div>
+  </div>
+
+  <!-- Saldo Deuda con Proveedores -->
+  <div class="kpi-card rose">
+    <div class="kpi-header">
+      <span class="kpi-title">Por Pagar a Proveedores</span>
+      <span class="kpi-icon">📑</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val" style="color: var(--accent-rose);">${{ "%.2f"|format(stats.deuda_proveedores_usd) }}</div>
+      <div class="kpi-sub-val" style="color: var(--accent-rose);">{{ "%.2f"|format(stats.deuda_proveedores_bs) }} Bs.</div>
+    </div>
+    <div class="kpi-foot">
+      <a href="{{ url_for('proveedores') }}" style="color: var(--primary-light); text-decoration: none;">Ver cuentas de proveedores &rarr;</a>
+    </div>
+  </div>
+
+</div>
+
+<!-- Segunda Fila de Indicadores: Análisis de Inventario y Pérdidas -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+
+  <!-- Valor y Potencial del Inventario en Bodega -->
+  <div class="card">
+    <h3 style="font-size: 1.15rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+      <span>👗</span> Valorización del Inventario Actual
+    </h3>
+    
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.65rem; border-bottom: 1px dashed var(--border-subtle);">
+        <span style="color: var(--text-muted);">Piezas totales en tienda:</span>
+        <strong style="font-size: 1.1rem;">{{ stats.total_piezas_stock }} piezas</strong>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.65rem; border-bottom: 1px dashed var(--border-subtle);">
+        <span style="color: var(--text-muted);">Costo de compra invertido:</span>
+        <span style="font-weight: 700; color: var(--text-main);">${{ "%.2f"|format(stats.costo_inventario_usd) }}</span>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.65rem; border-bottom: 1px dashed var(--border-subtle);">
+        <span style="color: var(--text-muted);">Valor de venta proyectado:</span>
+        <span style="font-weight: 700; color: var(--accent-emerald);">${{ "%.2f"|format(stats.valor_venta_inventario_usd) }}</span>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.25rem;">
+        <span style="font-weight: 600; color: var(--primary-dark);">Ganancia proyectada al vender todo:</span>
+        <span style="font-size: 1.2rem; font-weight: 800; color: var(--gold-dark);">${{ "%.2f"|format(stats.ganancia_potencial_inventario_usd) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auditoría de Anulaciones y Rendimiento del Mes -->
+  <div class="card">
+    <h3 style="font-size: 1.15rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem;">
+      <span>📅</span> Rendimiento del Mes & Pérdidas
+    </h3>
+
+    <div style="display: flex; flex-direction: column; gap: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.65rem; border-bottom: 1px dashed var(--border-subtle);">
+        <span style="color: var(--text-muted);">Ventas del mes en curso:</span>
+        <strong style="color: var(--accent-emerald); font-size: 1.1rem;">${{ "%.2f"|format(stats.ventas_mes_usd) }}</strong>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.65rem; border-bottom: 1px dashed var(--border-subtle);">
+        <span style="color: var(--text-muted);">Transacciones este mes:</span>
+        <strong>{{ stats.cant_ventas_mes }} recibos reales</strong>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.65rem; border-bottom: 1px dashed var(--border-subtle);">
+        <span style="color: var(--text-muted);">Ventas Anuladas en historial:</span>
+        <span style="color: var(--accent-rose); font-weight: 700;">{{ stats.cant_ventas_anuladas }} anulaciones (${{ "%.2f"|format(stats.ventas_anuladas_usd) }})</span>
+      </div>
+
+      <div style="padding-top: 0.25rem;">
+        <a href="{{ url_for('ventas', ver_anuladas=1) }}" class="btn btn-secondary btn-sm" style="width: 100%;">
+          <span>🔍</span> Revisar o Limpiar Ventas Anuladas
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Desglose por Categoría y por Método de Pago -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+  
+  <!-- Ventas Reales por Categoría -->
+  <div class="card">
+    <h3 style="font-size: 1.15rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+      <span>🏷️</span> Ventas por Categoría
+    </h3>
+
+    {% if stats.ventas_por_categoria %}
+      <div class="table-responsive">
+        <table class="table" style="font-size: 0.88rem;">
+          <thead>
+            <tr>
+              <th>Categoría</th>
+              <th style="text-align: center;">Piezas</th>
+              <th style="text-align: right;">Total Facturado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cat in stats.ventas_por_categoria %}
+            <tr>
+              <td><strong>{{ cat.categoria }}</strong></td>
+              <td style="text-align: center;"><span class="badge badge-emerald">{{ cat.piezas }} pzs</span></td>
+              <td style="text-align: right; font-weight: 700;">${{ "%.2f"|format(cat.total_usd) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); padding: 1.5rem 0; text-align: center;">No hay datos suficientes aún.</p>
+    {% endif %}
+  </div>
+
+  <!-- Ventas Reales por Método de Pago -->
+  <div class="card">
+    <h3 style="font-size: 1.15rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+      <span>💳</span> Ventas por Medio de Pago
+    </h3>
+
+    {% if stats.ventas_por_metodo %}
+      <div class="table-responsive">
+        <table class="table" style="font-size: 0.88rem;">
+          <thead>
+            <tr>
+              <th>Método</th>
+              <th style="text-align: center;">Cant</th>
+              <th style="text-align: right;">Total ($)</th>
+              <th style="text-align: right;">Total (Bs)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in stats.ventas_por_metodo %}
+            <tr>
+              <td><span class="badge badge-gray">{{ m.metodo_pago }}</span></td>
+              <td style="text-align: center;">{{ m.cantidad }}</td>
+              <td style="text-align: right; font-weight: 700;">${{ "%.2f"|format(m.total_usd) }}</td>
+              <td style="text-align: right; color: var(--primary-light);">{{ "%.2f"|format(m.total_bs) }} Bs.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p style="color: var(--text-muted); padding: 1.5rem 0; text-align: center;">No hay datos suficientes aún.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

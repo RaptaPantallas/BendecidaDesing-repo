@@ -1,0 +1,751 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Proveedores y Mercancía{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h2>Proveedores & Entrada de Mercancía</h2>
+    <p>Administración de códigos de proveedores, facturas de compras en divisas ($), abonos e ingreso directo al inventario</p>
+  </div>
+  <div class="header-actions" style="flex-wrap: wrap; gap: 0.5rem;">
+    <button class="btn btn-secondary btn-sm" onclick="abrirModalNuevoAbono()">
+      <span>💵</span> Registrar Abono / Pago
+    </button>
+    <button class="btn btn-emerald btn-sm" onclick="abrirModalNuevaCompra()">
+      <span>📦</span> Ingresar Factura & Mercancía
+    </button>
+    <button class="btn btn-primary btn-sm" onclick="abrirModalNuevoProveedor()">
+      <span>➕</span> Nuevo Proveedor
+    </button>
+  </div>
+</div>
+
+<!-- Resumen KPI Rápido de Proveedores -->
+<div class="kpi-grid" style="margin-bottom: 1.5rem;">
+  <div class="kpi-card">
+    <div class="kpi-header">
+      <span class="kpi-title">Total Proveedores</span>
+      <span class="kpi-icon">👥</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val">{{ proveedores|length }}</div>
+      <div class="kpi-sub-val">Proveedores comerciales activos</div>
+    </div>
+  </div>
+
+  <div class="kpi-card emerald">
+    <div class="kpi-header">
+      <span class="kpi-title">Facturas Registradas</span>
+      <span class="kpi-icon">📑</span>
+    </div>
+    <div class="kpi-value-group">
+      <div class="kpi-main-val">{{ compras|length }}</div>
+      <div class="kpi-sub-val">Recepciones de compras</div>
+    </div>
+  </div>
+
+  <div class="kpi-card rose">
+    <div class="kpi-header">
+      <span class="kpi-title">Saldo por Pagar ($)</span>
+      <span class="kpi-icon">⏳</span>
+    </div>
+    {% set total_deuda = namespace(val=0) %}
+    {% for c in compras %}
+      {% set total_deuda.val = total_deuda.val + c.saldo_pendiente_usd %}
+    {% endfor %}
+    <div class="kpi-value-group">
+      <div class="kpi-main-val" style="color: var(--accent-rose);">${{ "%.2f"|format(total_deuda.val) }}</div>
+      <div class="kpi-sub-val" style="color: var(--accent-rose);">≈ {{ "%.2f"|format(total_deuda.val * tasa) }} Bs.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Pestañas de Navegación de la sección -->
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem; overflow-x: auto;">
+  <button class="btn btn-secondary btn-sm prov-tab-btn active" onclick="switchProvTab('tab-proveedores', this)">
+    <span>👥</span> Directorio de Proveedores
+  </button>
+  <button class="btn btn-secondary btn-sm prov-tab-btn" onclick="switchProvTab('tab-facturas', this)">
+    <span>📦</span> Facturas & Compras en Divisas
+  </button>
+  <button class="btn btn-secondary btn-sm prov-tab-btn" onclick="switchProvTab('tab-abonos', this)">
+    <span>💰</span> Historial de Abonos / Pagos
+  </button>
+</div>
+
+<!-- PESTAÑA 1: DIRECTORIO DE PROVEEDORES -->
+<div id="tab-proveedores" class="prov-tab-content">
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Nombre / Razón Social</th>
+          <th>Contacto / Encargado</th>
+          <th>Teléfono</th>
+          <th style="text-align: right;">Total Facturado ($)</th>
+          <th style="text-align: right;">Saldo Pendiente ($)</th>
+          <th style="text-align: center;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if proveedores %}
+          {% for p in proveedores %}
+          <tr>
+            <td>
+              <code style="background: rgba(212, 93, 130, 0.12); padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 700; color: var(--primary-dark);">
+                {{ p.codigo }}
+              </code>
+            </td>
+            <td>
+              <strong>{{ p.nombre }}</strong>
+              {% if p.direccion %}<br><small style="color: var(--text-muted);">📍 {{ p.direccion }}</small>{% endif %}
+            </td>
+            <td>{{ p.contacto or 'Principal' }}</td>
+            <td>
+              {% if p.telefono %}
+                <a href="https://wa.me/{{ p.telefono|replace(' ', '')|replace('+', '')|replace('-', '') }}" target="_blank" style="color: var(--accent-emerald); text-decoration: none; font-weight: 600;">
+                  💬 {{ p.telefono }}
+                </a>
+              {% else %}
+                <span style="color: var(--text-muted);">-</span>
+              {% endif %}
+            </td>
+            <td style="text-align: right; font-weight: 600;">
+              ${{ "%.2f"|format(p.total_facturado_usd) }}
+            </td>
+            <td style="text-align: right;">
+              {% if p.saldo_deuda_usd > 0.01 %}
+                <span class="badge badge-rose">${{ "%.2f"|format(p.saldo_deuda_usd) }}</span>
+              {% else %}
+                <span class="badge badge-emerald">Al día ($0.00)</span>
+              {% endif %}
+            </td>
+            <td style="text-align: center;">
+              <div style="display: flex; gap: 0.35rem; justify-content: center;">
+                <button 
+                  class="btn btn-emerald btn-icon-only btn-sm" 
+                  title="Registrar Compra / Factura de este proveedor"
+                  onclick="abrirModalNuevaCompraConProveedor({{ p.id }}, '{{ p.codigo }}', '{{ p.nombre|replace("'", "\\'") }}')"
+                >
+                  📦
+                </button>
+                <button 
+                  class="btn btn-secondary btn-icon-only btn-sm" 
+                  title="Editar Proveedor"
+                  onclick='abrirModalEditarProveedor({{ p|tojson }})'
+                >
+                  ✏️
+                </button>
+                <button 
+                  class="btn btn-rose btn-icon-only btn-sm" 
+                  title="Eliminar Proveedor"
+                  onclick="confirmarEliminarProveedor({{ p.id }}, '{{ p.nombre|replace("'", "\\'") }}')"
+                >
+                  🗑️
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+              No hay proveedores registrados. Presione <strong>"Nuevo Proveedor"</strong> para comenzar.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PESTAÑA 2: FACTURAS Y RECEPCIÓN DE MERCANCÍA -->
+<div id="tab-facturas" class="prov-tab-content" style="display: none;">
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Factura / Nota</th>
+          <th>Fecha</th>
+          <th>Proveedor</th>
+          <th style="text-align: right;">Total Compra ($)</th>
+          <th style="text-align: right;">Abonado ($)</th>
+          <th style="text-align: right;">Saldo Restante ($)</th>
+          <th style="text-align: center;">Estado</th>
+          <th style="text-align: center;">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if compras %}
+          {% for c in compras %}
+          <tr>
+            <td>
+              <strong>{{ c.numero_factura }}</strong>
+              {% if c.notas %}<br><small style="color: var(--text-muted);">{{ c.notas }}</small>{% endif %}
+            </td>
+            <td>{{ c.fecha }}</td>
+            <td>
+              <code style="color: var(--primary-light);">{{ c.proveedor_codigo }}</code> - <strong>{{ c.proveedor_nombre }}</strong>
+            </td>
+            <td style="text-align: right; font-weight: 700;">
+              ${{ "%.2f"|format(c.monto_total_usd) }}
+            </td>
+            <td style="text-align: right; color: var(--accent-emerald);">
+              ${{ "%.2f"|format(c.monto_pagado_usd) }}
+            </td>
+            <td style="text-align: right;">
+              {% if c.saldo_pendiente_usd > 0.01 %}
+                <span style="font-weight: 700; color: var(--accent-rose);">${{ "%.2f"|format(c.saldo_pendiente_usd) }}</span>
+              {% else %}
+                <span style="color: var(--accent-emerald); font-weight: 600;">$0.00</span>
+              {% endif %}
+            </td>
+            <td style="text-align: center;">
+              {% if c.estado == 'PAGADA' %}
+                <span class="badge badge-emerald">Pagada</span>
+              {% elif c.estado == 'PARCIAL' %}
+                <span class="badge badge-amber">Abonada</span>
+              {% else %}
+                <span class="badge badge-rose">Pendiente</span>
+              {% endif %}
+            </td>
+            <td style="text-align: center;">
+              {% if c.saldo_pendiente_usd > 0.01 %}
+                <button 
+                  class="btn btn-secondary btn-sm" 
+                  title="Abonar a esta factura"
+                  onclick="abrirModalAbonoDirectoFactura({{ c.proveedor_id }}, {{ c.id }}, '{{ c.numero_factura }}', {{ c.saldo_pendiente_usd }})"
+                >
+                  💵 Abonar
+                </button>
+              {% else %}
+                <span style="color: var(--text-muted); font-size: 0.8rem;">✓ Solventada</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+              No se han registrado facturas de compras a proveedores.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- PESTAÑA 3: HISTORIAL DE ABONOS Y PAGOS -->
+<div id="tab-abonos" class="prov-tab-content" style="display: none;">
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Fecha / Hora</th>
+          <th>Proveedor</th>
+          <th>Factura Asoc.</th>
+          <th>Método de Pago</th>
+          <th style="text-align: right;">Abono ($)</th>
+          <th style="text-align: right;">Abono (Bs)</th>
+          <th>Referencia / Notas</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if abonos %}
+          {% for a in abonos %}
+          <tr>
+            <td>{{ a.fecha }}</td>
+            <td>
+              <code style="color: var(--primary-light);">{{ a.proveedor_codigo }}</code> - <strong>{{ a.proveedor_nombre }}</strong>
+            </td>
+            <td>
+              {{ a.numero_factura or 'General' }}
+            </td>
+            <td>
+              <span class="badge badge-gray">{{ a.metodo_pago }}</span>
+            </td>
+            <td style="text-align: right; font-weight: 700; color: var(--accent-emerald);">
+              ${{ "%.2f"|format(a.monto_usd) }}
+            </td>
+            <td style="text-align: right; color: var(--primary-light);">
+              {{ "%.2f"|format(a.monto_bs) }} Bs.
+              <div style="font-size: 0.72rem; color: var(--text-muted);">(Tasa: {{ "%.2f"|format(a.tasa_cambio) }})</div>
+            </td>
+            <td>
+              <small>{{ a.referencia or '' }} {{ a.notas or '' }}</small>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+              No se han registrado abonos a proveedores todavía.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL 1: REGISTRAR / EDITAR PROVEEDOR -->
+<div id="modal-proveedor" class="modal-overlay">
+  <div class="modal-box" style="max-width: 520px;">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modal-proveedor-titulo">Registrar Proveedor</h3>
+      <button class="modal-close" onclick="closeModal('modal-proveedor')">&times;</button>
+    </div>
+    <form id="form-proveedor" onsubmit="guardarProveedor(event)">
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="prov-codigo">Código del Proveedor *</label>
+            <input type="text" id="prov-codigo" name="codigo" class="form-control" placeholder="Ej: PROV-001" required>
+            <span class="form-helper">Identificador único del proveedor</span>
+          </div>
+
+          <div class="form-group">
+            <label for="prov-telefono">Teléfono / WhatsApp</label>
+            <input type="text" id="prov-telefono" name="telefono" class="form-control" placeholder="Ej: 0412-1234567">
+          </div>
+
+          <div class="form-group col-span-2">
+            <label for="prov-nombre">Nombre o Razón Social *</label>
+            <input type="text" id="prov-nombre" name="nombre" class="form-control" placeholder="Ej: Distribuidora Textil Caracas C.A." required>
+          </div>
+
+          <div class="form-group">
+            <label for="prov-contacto">Persona de Contacto</label>
+            <input type="text" id="prov-contacto" name="contacto" class="form-control" placeholder="Ej: Juan Pérez">
+          </div>
+
+          <div class="form-group">
+            <label for="prov-direccion">Ciudad / Dirección</label>
+            <input type="text" id="prov-direccion" name="direccion" class="form-control" placeholder="Ej: El Cementerio, Galpón 4">
+          </div>
+
+          <div class="form-group col-span-2">
+            <label for="prov-notas">Notas / Condiciones Comerciales</label>
+            <textarea id="prov-notas" name="notas" class="form-control" rows="2" placeholder="Ej: Despachos los martes, pago a 15 días"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-proveedor')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-proveedor">Guardar Proveedor</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL 2: REGISTRAR FACTURA DE COMPRA & ENTRADA DE INVENTARIO -->
+<div id="modal-compra" class="modal-overlay">
+  <div class="modal-box" style="max-width: 740px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Ingresar Factura de Mercancía & Inventario</h3>
+      <button class="modal-close" onclick="closeModal('modal-compra')">&times;</button>
+    </div>
+    <form id="form-compra" onsubmit="guardarCompraMercancia(event)">
+      <div class="modal-body">
+        
+        <!-- Datos de cabecera de la factura en divisas -->
+        <div style="background: rgba(212, 93, 130, 0.06); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1rem; margin-bottom: 1.25rem;">
+          <h4 style="font-size: 0.95rem; margin-bottom: 0.75rem; color: var(--primary-dark);">📑 Datos de la Factura / Compra (Divisas $)</h4>
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="compra-proveedor-id">Proveedor *</label>
+              <select id="compra-proveedor-id" name="proveedor_id" class="form-select" required>
+                <option value="">Seleccione proveedor...</option>
+                {% for p in proveedores %}
+                  <option value="{{ p.id }}">{{ p.codigo }} - {{ p.nombre }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="compra-factura">Nro. de Factura / Control *</label>
+              <input type="text" id="compra-factura" name="numero_factura" class="form-control" placeholder="Ej: FAC-8492" required>
+            </div>
+
+            <div class="form-group">
+              <label for="compra-monto-total">Monto Total de Compra ($ USD) *</label>
+              <input type="number" step="0.01" min="0.01" id="compra-monto-total" name="monto_total_usd" class="form-control" placeholder="0.00" required oninput="recalcularSaldoCompra()">
+            </div>
+
+            <div class="form-group">
+              <label for="compra-monto-pagado">Monto Pagado Inmediato ($ USD)</label>
+              <input type="number" step="0.01" min="0" id="compra-monto-pagado" name="monto_pagado_usd" class="form-control" value="0.00" oninput="recalcularSaldoCompra()">
+            </div>
+
+            <div class="form-group">
+              <label>Saldo Deuda Restante ($ USD):</label>
+              <div id="compra-saldo-label" style="font-size: 1.15rem; font-weight: 700; color: var(--accent-rose); padding-top: 0.4rem;">$0.00</div>
+            </div>
+
+            <div class="form-group">
+              <label for="compra-metodo-pago">Método de Pago (Si abonó):</label>
+              <select id="compra-metodo-pago" name="metodo_pago_inicial" class="form-select">
+                <option value="Efectivo Divisas ($)">💵 Efectivo Divisas ($ USD)</option>
+                <option value="Pago Móvil (Bs)">📲 Pago Móvil (Bs)</option>
+                <option value="Zelle ($)">🏦 Zelle ($ USD)</option>
+                <option value="Transferencia Bancaria">🏛️ Transferencia Bancaria</option>
+                <option value="Binance Pay / USDT">🪙 Binance Pay / USDT</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recepción de Prendas al Inventario -->
+        <div style="margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h4 style="font-size: 0.95rem; color: var(--text-main);">👗 Prendas que Ingresan al Inventario</h4>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="agregarFilaPrendaCompra()">
+              <span>➕</span> Agregar Prenda
+            </button>
+          </div>
+          <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            Al ingresar costo y precio de venta, el sistema calculará automáticamente la ganancia por pieza.
+          </p>
+
+          <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+            <table class="table" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th>Código Prenda</th>
+                  <th>Descripción / Nombre</th>
+                  <th>Categoría</th>
+                  <th>Talla / Color</th>
+                  <th style="width: 70px;">Cant.</th>
+                  <th style="width: 90px;">Costo ($)</th>
+                  <th style="width: 90px;">Venta ($)</th>
+                  <th style="width: 40px;"></th>
+                </tr>
+              </thead>
+              <tbody id="tbody-prendas-compra">
+                <!-- Filas dinámicas -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-compra')">Cancelar</button>
+        <button type="submit" class="btn btn-emerald" id="btn-submit-compra">Registrar Compra & Entrada</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL 3: REGISTRAR ABONO / PAGO A PROVEEDOR -->
+<div id="modal-abono" class="modal-overlay">
+  <div class="modal-box" style="max-width: 480px;">
+    <div class="modal-header">
+      <h3 class="modal-title">Registrar Abono a Proveedor</h3>
+      <button class="modal-close" onclick="closeModal('modal-abono')">&times;</button>
+    </div>
+    <form id="form-abono" onsubmit="guardarAbonoProveedor(event)">
+      <div class="modal-body">
+        <div class="form-grid">
+          
+          <div class="form-group col-span-2">
+            <label for="abono-proveedor-id">Proveedor *</label>
+            <select id="abono-proveedor-id" name="proveedor_id" class="form-select" required>
+              <option value="">Seleccione proveedor...</option>
+              {% for p in proveedores %}
+                <option value="{{ p.id }}">{{ p.codigo }} - {{ p.nombre }} (Deuda: ${{ "%.2f"|format(p.saldo_deuda_usd) }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="abono-monto-usd">Monto a Abonar ($ USD) *</label>
+            <input type="number" step="0.01" min="0.01" id="abono-monto-usd" name="monto_usd" class="form-control" placeholder="0.00" required oninput="actualizarPreviewAbonoBs(this.value)">
+            <span id="abono-bs-preview" class="form-helper" style="color: var(--primary-light);">≈ 0.00 Bs.</span>
+          </div>
+
+          <div class="form-group">
+            <label for="abono-metodo">Forma de Pago *</label>
+            <select id="abono-metodo" name="metodo_pago" class="form-select" required>
+              <option value="Efectivo Divisas ($)">💵 Efectivo Divisas ($ USD)</option>
+              <option value="Pago Móvil (Bs)">📲 Pago Móvil (Bs)</option>
+              <option value="Zelle ($)">🏦 Zelle ($ USD)</option>
+              <option value="Transferencia Bancaria (Bs)">🏛️ Transferencia Bancaria (Bs)</option>
+              <option value="Binance Pay / USDT">🪙 Binance Pay / USDT</option>
+            </select>
+          </div>
+
+          <div class="form-group col-span-2">
+            <label for="abono-referencia">Referencia Bancaria / Comprobante</label>
+            <input type="text" id="abono-referencia" name="referencia" class="form-control" placeholder="Ej: Transf #18290 o billetes">
+          </div>
+
+          <div class="form-group col-span-2">
+            <label for="abono-notas">Notas / Concepto</label>
+            <input type="text" id="abono-notas" name="notas" class="form-control" placeholder="Ej: Abono quincenal de mercancía">
+          </div>
+
+          <input type="hidden" id="abono-compra-id" name="compra_id" value="">
+
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-abono')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-abono">Guardar Abono</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let modalEditProveedorId = null;
+
+  function switchProvTab(tabId, btn) {
+    document.querySelectorAll('.prov-tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.prov-tab-btn').forEach(b => b.classList.remove('active'));
+    
+    const target = document.getElementById(tabId);
+    if (target) target.style.display = 'block';
+    if (btn) btn.classList.add('active');
+  }
+
+  function abrirModalNuevoProveedor() {
+    modalEditProveedorId = null;
+    document.getElementById('form-proveedor').reset();
+    document.getElementById('modal-proveedor-titulo').textContent = 'Registrar Proveedor';
+    openModal('modal-proveedor');
+  }
+
+  function abrirModalEditarProveedor(p) {
+    modalEditProveedorId = p.id;
+    document.getElementById('modal-proveedor-titulo').textContent = `Editar Proveedor: ${p.codigo}`;
+    document.getElementById('prov-codigo').value = p.codigo || '';
+    document.getElementById('prov-nombre').value = p.nombre || '';
+    document.getElementById('prov-contacto').value = p.contacto || '';
+    document.getElementById('prov-telefono').value = p.telefono || '';
+    document.getElementById('prov-direccion').value = p.direccion || '';
+    document.getElementById('prov-notas').value = p.notas || '';
+    openModal('modal-proveedor');
+  }
+
+  async function guardarProveedor(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    const url = modalEditProveedorId ? `/api/proveedores/${modalEditProveedorId}/editar` : '/api/proveedores/crear';
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const resp = await res.json();
+      if (resp.success) {
+        showToast(resp.message, 'success');
+        closeModal('modal-proveedor');
+        setTimeout(() => window.location.reload(), 500);
+      } else {
+        showToast(resp.message || 'Error al guardar proveedor', 'error');
+      }
+    } catch (err) {
+      showToast('Error de conexión', 'error');
+    }
+  }
+
+  async function confirmarEliminarProveedor(id, nombre) {
+    if (!confirm(`¿Eliminar o desactivar al proveedor ${nombre}?`)) return;
+    try {
+      const res = await fetch(`/api/proveedores/${id}/eliminar`, { method: 'POST' });
+      const resp = await res.json();
+      if (resp.success) {
+        showToast(resp.message, 'success');
+        setTimeout(() => window.location.reload(), 500);
+      } else {
+        showToast(resp.message || 'Error al eliminar', 'error');
+      }
+    } catch (err) {
+      showToast('Error de conexión', 'error');
+    }
+  }
+
+  // Compras y Mercancía
+  function abrirModalNuevaCompra() {
+    document.getElementById('form-compra').reset();
+    document.getElementById('tbody-prendas-compra').innerHTML = '';
+    agregarFilaPrendaCompra();
+    recalcularSaldoCompra();
+    openModal('modal-compra');
+  }
+
+  function abrirModalNuevaCompraConProveedor(id, codigo, nombre) {
+    abrirModalNuevaCompra();
+    const select = document.getElementById('compra-proveedor-id');
+    if (select) select.value = id;
+  }
+
+  function recalcularSaldoCompra() {
+    const total = parseFloat(document.getElementById('compra-monto-total').value) || 0;
+    const pagado = parseFloat(document.getElementById('compra-monto-pagado').value) || 0;
+    const saldo = Math.max(0, total - pagado);
+    document.getElementById('compra-saldo-label').textContent = `$${saldo.toFixed(2)}`;
+  }
+
+  function agregarFilaPrendaCompra() {
+    const tbody = document.getElementById('tbody-prendas-compra');
+    const index = tbody.children.length;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" class="form-control form-control-sm p-code" placeholder="Ej: BLU-010" required></td>
+      <td><input type="text" class="form-control form-control-sm p-name" placeholder="Nombre prenda" required></td>
+      <td>
+        <select class="form-select form-select-sm p-cat">
+          {% for c in categorias %}
+            <option value="{{ c }}">{{ c }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      <td>
+        <div style="display: flex; gap: 0.2rem;">
+          <input type="text" class="form-control form-control-sm p-talla" placeholder="Talla" style="width: 50px;" value="M">
+          <input type="text" class="form-control form-control-sm p-color" placeholder="Color" value="Varios">
+        </div>
+      </td>
+      <td><input type="number" min="1" class="form-control form-control-sm p-cant" value="1" required></td>
+      <td><input type="number" step="0.01" min="0" class="form-control form-control-sm p-costo" placeholder="0.00" value="0.00"></td>
+      <td><input type="number" step="0.01" min="0" class="form-control form-control-sm p-venta" placeholder="0.00" value="0.00"></td>
+      <td><button type="button" class="btn btn-rose btn-icon-only btn-sm" onclick="this.closest('tr').remove()" title="Quitar">×</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  async function guardarCompraMercancia(e) {
+    e.preventDefault();
+    const provId = document.getElementById('compra-proveedor-id').value;
+    const nroFactura = document.getElementById('compra-factura').value;
+    const montoTotal = parseFloat(document.getElementById('compra-monto-total').value) || 0;
+    const montoPagado = parseFloat(document.getElementById('compra-monto-pagado').value) || 0;
+    const metodoPago = document.getElementById('compra-metodo-pago').value;
+
+    if (!provId) {
+      showToast('Debe seleccionar un proveedor', 'error');
+      return;
+    }
+
+    // Recolectar prendas
+    const filas = document.querySelectorAll('#tbody-prendas-compra tr');
+    const prendas = [];
+    filas.forEach(row => {
+      const codigo = row.querySelector('.p-code')?.value.trim();
+      const nombre = row.querySelector('.p-name')?.value.trim();
+      const cat = row.querySelector('.p-cat')?.value;
+      const talla = row.querySelector('.p-talla')?.value.trim() || 'M';
+      const color = row.querySelector('.p-color')?.value.trim() || 'Varios';
+      const cant = parseInt(row.querySelector('.p-cant')?.value) || 1;
+      const costo = parseFloat(row.querySelector('.p-costo')?.value) || 0;
+      const venta = parseFloat(row.querySelector('.p-venta')?.value) || 0;
+
+      if (codigo && nombre) {
+        prendas.push({
+          codigo: codigo,
+          nombre: nombre,
+          categoria: cat,
+          talla: talla,
+          color: color,
+          cantidad: cant,
+          precio_costo: costo,
+          precio_venta: venta
+        });
+      }
+    });
+
+    const payload = {
+      proveedor_id: provId,
+      numero_factura: nroFactura,
+      monto_total_usd: montoTotal,
+      monto_pagado_usd: montoPagado,
+      metodo_pago_inicial: metodoPago,
+      prendas: prendas
+    };
+
+    const btn = document.getElementById('btn-submit-compra');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+    try {
+      const res = await fetch('/api/proveedores/compras/crear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const resp = await res.json();
+      if (resp.success) {
+        showToast(resp.message, 'success');
+        closeModal('modal-compra');
+        setTimeout(() => window.location.reload(), 600);
+      } else {
+        showToast(resp.message || 'Error al registrar compra', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Registrar Compra & Entrada'; }
+      }
+    } catch (err) {
+      showToast('Error de conexión', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Registrar Compra & Entrada'; }
+    }
+  }
+
+  // Abonos
+  function abrirModalNuevoAbono() {
+    document.getElementById('form-abono').reset();
+    document.getElementById('abono-compra-id').value = '';
+    actualizarPreviewAbonoBs(0);
+    openModal('modal-abono');
+  }
+
+  function abrirModalAbonoDirectoFactura(proveedorId, compraId, nroFactura, saldo) {
+    abrirModalNuevoAbono();
+    document.getElementById('abono-proveedor-id').value = proveedorId;
+    document.getElementById('abono-compra-id').value = compraId;
+    document.getElementById('abono-monto-usd').value = saldo.toFixed(2);
+    document.getElementById('abono-notas').value = `Pago para amortizar factura #${nroFactura}`;
+    actualizarPreviewAbonoBs(saldo);
+  }
+
+  function actualizarPreviewAbonoBs(val) {
+    const num = parseFloat(val) || 0;
+    const bs = num * CURRENT_TASA;
+    document.getElementById('abono-bs-preview').textContent = `≈ ${bs.toFixed(2)} Bs. (a tasa activa)`;
+  }
+
+  async function guardarAbonoProveedor(e) {
+    e.preventDefault();
+    const form = e.target;
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    try {
+      const res = await fetch('/api/proveedores/abonos/crear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const resp = await res.json();
+      if (resp.success) {
+        showToast(resp.message, 'success');
+        closeModal('modal-abono');
+        setTimeout(() => window.location.reload(), 600);
+      } else {
+        showToast(resp.message || 'Error al registrar abono', 'error');
+      }
+    } catch (err) {
+      showToast('Error de conexión', 'error');
+    }
+  }
+</script>
+{% endblock %}

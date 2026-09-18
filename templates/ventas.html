@@ -6,17 +6,43 @@
 <div class="page-header">
   <div class="page-title-group">
     <h2>Historial de Ventas y Salidas</h2>
-    <p>Registro cronológico de operaciones con tasa histórica y método de pago</p>
+    <p>Registro de operaciones reales con tasa histórica y desglose en divisas ($) y bolívares (Bs.)</p>
   </div>
-  <div class="header-actions">
-    <a href="{{ url_for('exportar_ventas_csv') }}" class="btn btn-emerald">
-      <span>📥</span> Exportar a Excel (CSV)
+  <div class="header-actions" style="flex-wrap: wrap; gap: 0.5rem;">
+    {% if ver_anuladas %}
+      <a href="{{ url_for('ventas') }}" class="btn btn-secondary btn-sm">
+        <span>👁️</span> Ver Solo Ventas Reales
+      </a>
+      <button class="btn btn-rose btn-sm" onclick="purgarTodasVentasAnuladas()">
+        <span>🗑️</span> Borrar Todas las Anuladas
+      </button>
+    {% else %}
+      <a href="{{ url_for('ventas', ver_anuladas=1) }}" class="btn btn-secondary btn-sm" title="Ver ventas que fueron anuladas">
+        <span>⚠️</span> Ver Anuladas
+      </a>
+    {% endif %}
+
+    <a href="{{ url_for('exportar_ventas_csv') }}" class="btn btn-emerald btn-sm">
+      <span>📥</span> Excel (CSV)
     </a>
-    <a href="{{ url_for('pos') }}" class="btn btn-primary">
+    <a href="{{ url_for('pos') }}" class="btn btn-primary btn-sm">
       <span>➕</span> Nueva Venta
     </a>
   </div>
 </div>
+
+<!-- Banner informativo si está viendo sólo ventas reales o anuladas -->
+{% if ver_anuladas %}
+  <div style="background: rgba(225, 29, 72, 0.08); border: 1px solid rgba(225, 29, 72, 0.25); border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem;">
+    <div>
+      <strong style="color: var(--accent-rose);">⚠️ Mostrando Ventas Anuladas:</strong>
+      <span style="color: var(--text-muted);"> Puede eliminarlas permanentemente para limpiar el sistema y que no aparezcan.</span>
+    </div>
+    <button class="btn btn-rose btn-sm" onclick="purgarTodasVentasAnuladas()">
+      🗑️ Limpiar y Borrar Definitivamente
+    </button>
+  </div>
+{% endif %}
 
 <div class="table-responsive">
   <table class="table">
@@ -36,7 +62,7 @@
     <tbody>
       {% if ventas %}
         {% for v in ventas %}
-        <tr class="{% if v.estado == 'ANULADA' %}table-row-danger{% endif %}" style="{% if v.estado == 'ANULADA' %}opacity: 0.6; text-decoration: line-through;{% endif %}">
+        <tr class="{% if v.estado == 'ANULADA' %}table-row-danger{% endif %}" style="{% if v.estado == 'ANULADA' %}opacity: 0.7;{% endif %}">
           <td>
             <code style="background: rgba(255,255,255,0.06); padding: 0.2rem 0.45rem; border-radius: 4px; font-weight: 600; color: var(--primary-light);">
               {{ v.numero_recibo }}
@@ -81,10 +107,18 @@
               {% if v.estado == 'COMPLETADA' %}
               <button 
                 class="btn btn-rose btn-icon-only btn-sm" 
-                title="Anular venta y reponer stock"
+                title="Anular venta y reponer stock al inventario"
                 onclick="anularVenta({{ v.id }}, '{{ v.numero_recibo }}')"
               >
                 🚫
+              </button>
+              {% else %}
+              <button 
+                class="btn btn-rose btn-icon-only btn-sm" 
+                title="Borrar definitivamente del sistema"
+                onclick="eliminarVentaDefinitiva({{ v.id }}, '{{ v.numero_recibo }}')"
+              >
+                🗑️
               </button>
               {% endif %}
             </div>
@@ -94,7 +128,11 @@
       {% else %}
         <tr>
           <td colspan="9" style="text-align: center; padding: 3rem; color: var(--text-muted);">
-            No hay registros de ventas recientes.
+            {% if ver_anuladas %}
+              No hay ventas anuladas registradas. Todo el historial está limpio.
+            {% else %}
+              No hay registros de ventas reales recientes.
+            {% endif %}
           </td>
         </tr>
       {% endif %}

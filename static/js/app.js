@@ -347,3 +347,48 @@ async function verDetalleVenta(ventaId) {
     showToast('Error al cargar la venta', 'error');
   }
 }
+
+// Eliminar venta definitivamente (para ventas anuladas)
+async function eliminarVentaDefinitiva(ventaId, numeroRecibo) {
+  if (!confirm(`¿Está completamente seguro de ELIMINAR DEFINITIVAMENTE la venta anulada ${numeroRecibo}? Esta acción no se puede deshacer y borrará todo rastro del historial.`)) return;
+
+  try {
+    const res = await fetch(`/api/ventas/${ventaId}/eliminar_definitiva`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message, 'success');
+      setTimeout(() => window.location.reload(), 600);
+    } else {
+      showToast(data.message || 'Error al eliminar', 'error');
+    }
+  } catch (err) {
+    showToast('Error al procesar la solicitud', 'error');
+  }
+}
+
+// Purgar todas las ventas anuladas del sistema
+async function purgarTodasVentasAnuladas() {
+  if (!confirm('¿Desea BORRAR DEFINITIVAMENTE TODAS las ventas anuladas? El historial quedará purgado únicamente con las ventas reales y válidas.')) return;
+
+  try {
+    const res = await fetch('/api/ventas/purgar_anuladas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message, 'success');
+      setTimeout(() => {
+        window.location.href = '/ventas';
+      }, 700);
+    } else {
+      showToast(data.message || 'Error al purgar', 'error');
+    }
+  } catch (err) {
+    showToast('Error al conectar con el servidor', 'error');
+  }
+}
+

@@ -68,7 +68,8 @@ def login():
 
     error = None
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        # Permitir login sin requerir contraseña
+        username = request.form.get('username', 'admin').strip() or 'admin'
         password = request.form.get('password', '')
 
         user = db.verificar_usuario(username, password)
@@ -80,7 +81,7 @@ def login():
             next_page = request.args.get('next')
             return redirect(next_page or url_for('dashboard'))
         else:
-            error = 'Usuario o contraseña incorrectos. Verifique sus datos.'
+            error = 'No se pudo iniciar sesión. Verifique el usuario.'
 
     return render_template('login.html', error=error)
 
@@ -131,9 +132,34 @@ def pos():
 
 @app.route('/ventas')
 def ventas():
-    ventas_lista = db.get_ventas_recientes(100)
+    # Por defecto mostrar solo ventas REALES (completadas)
+    ver_anuladas = request.args.get('ver_anuladas', '0') == '1'
+    ventas_lista = db.get_ventas_recientes(200, incluir_anuladas=ver_anuladas)
     tasa = db.get_tasa_dolar()
-    return render_template('ventas.html', ventas=ventas_lista, tasa=tasa, active_page='ventas')
+    return render_template('ventas.html', ventas=ventas_lista, tasa=tasa, ver_anuladas=ver_anuladas, active_page='ventas')
+
+@app.route('/proveedores')
+def proveedores():
+    proveedores_lista = db.get_todos_proveedores(solo_activos=True)
+    compras_lista = db.get_compras_proveedores(limite=50)
+    abonos_lista = db.get_abonos_proveedores(limite=50)
+    categorias = db.get_categorias()
+    tasa = db.get_tasa_dolar()
+    return render_template(
+        'proveedores.html',
+        proveedores=proveedores_lista,
+        compras=compras_lista,
+        abonos=abonos_lista,
+        categorias=categorias,
+        tasa=tasa,
+        active_page='proveedores'
+    )
+
+@app.route('/estadisticas')
+def estadisticas():
+    stats = db.get_estadisticas_completas()
+    tasa = db.get_tasa_dolar()
+    return render_template('estadisticas.html', stats=stats, tasa=tasa, active_page='estadisticas')
 
 @app.route('/configuracion')
 def configuracion():
@@ -334,12 +360,96 @@ def api_anular_venta(venta_id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
+@app.route('/api/ventas/<int:venta_id>/eliminar_definitiva', methods=['POST'])
+def api_eliminar_venta_definitiva(venta_id):
+    try:
+        db.eliminar_venta_definitiva(venta_id)
+        return jsonify({'success': True, 'message': 'Venta anulada eliminada definitivamente del sistema'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/ventas/purgar_anuladas', methods=['POST'])
+def api_purgar_ventas_anuladas():
+    try:
+        total = db.purgar_ventas_anuladas()
+        return jsonify({'success': True, 'message': f'Se han eliminado definitivamente {total} ventas anuladas. El historial solo contiene ventas reales.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
 @app.route('/api/ventas/<int:venta_id>', methods=['GET'])
 def api_ver_venta(venta_id):
     detalle = db.get_venta_completa(venta_id)
     if not detalle:
         return jsonify({'success': False, 'message': 'Venta no encontrada'}), 404
     return jsonify({'success': True, 'datos': detalle})
+
+# ================= APIS PROVEEDORES, COMPRAS Y ABONOS =================
+
+@app.route('/api/proveedores', methods=['GET'])
+def api_obtener_proveedores():
+    provs = db.get_todos_proveedores(solo_activos=True)
+    return jsonify({'success': True, 'proveedores': provs})
+
+@app.route('/api/proveedores/crear', methods=['POST'])
+def api_crear_proveedor():
+    try:
+        data = request.get_json() or request.form
+        nombre = data.get('nombre', '').strip()
+        if not nombre:
+            return jsonify({'success': False, 'message': 'El nombre del proveedor es obligatorio'}), 400
+        
+        nuevo_id = db.crear_proveedor(data)
+        return jsonify({'success': True, 'message': 'Proveedor registrado exitosamente', 'id': nuevo_id})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/proveedores/<int:proveedor_id>/editar', methods=['POST'])
+def api_editar_proveedor(proveedor_id):
+    try:
+        data = request.get_json() or request.form
+        db.actualizar_proveedor(proveedor_id, data)
+        return jsonify({'success': True, 'message': 'Proveedor actualizado correctamente'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/proveedores/<int:proveedor_id>/eliminar', methods=['POST'])
+def api_eliminar_proveedor(proveedor_id):
+    try:
+        accion = db.eliminar_o_desactivar_proveedor(proveedor_id)
+        msg = 'Proveedor eliminado' if accion == 'eliminado' else 'Proveedor desactivado (tenía compras registradas)'
+        return jsonify({'success': True, 'message': msg})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/proveedores/compras/crear', methods=['POST'])
+def api_crear_compra_proveedor():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No se recibieron datos de la factura'}), 400
+        
+        prendas = data.get('prendas', [])
+        compra_id = db.registrar_compra_proveedor(data, prendas_ingresadas=prendas)
+        return jsonify({
+            'success': True,
+            'message': 'Factura de compra e inventario registrados exitosamente en divisas ($ USD)',
+            'compra_id': compra_id
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/api/proveedores/abonos/crear', methods=['POST'])
+def api_crear_abono_proveedor():
+    try:
+        data = request.get_json() or request.form
+        abono_id = db.registrar_abono_proveedor(data)
+        return jsonify({
+            'success': True,
+            'message': 'Abono a proveedor registrado y saldo amortizado exitosamente',
+            'abono_id': abono_id
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 @app.route('/api/configuracion/guardar', methods=['POST'])
 def api_guardar_configuracion():
