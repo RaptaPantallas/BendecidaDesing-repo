@@ -61,6 +61,7 @@
         <th>Código / SKU</th>
         <th>Prenda</th>
         <th>Categoría</th>
+        <th>Proveedor</th>
         <th>Talla</th>
         <th>Color</th>
         <th style="text-align: right;">Costo ($)</th>
@@ -92,6 +93,13 @@
           </td>
           <td>
             <span class="badge badge-gray">{{ p.categoria }}</span>
+          </td>
+          <td>
+            {% if p.proveedor_nombre %}
+              <span class="badge badge-amber" style="font-size: 0.72rem;">📦 {{ p.proveedor_nombre }}</span>
+            {% else %}
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Sin asignar</span>
+            {% endif %}
           </td>
           <td>
             <span class="badge-pill-talla">{{ p.talla }}</span>
@@ -140,7 +148,7 @@
         {% endfor %}
       {% else %}
         <tr>
-          <td colspan="10" style="text-align: center; padding: 3rem; color: var(--text-muted);">
+          <td colspan="11" style="text-align: center; padding: 3rem; color: var(--text-muted);">
             No se encontraron prendas con los criterios seleccionados.
           </td>
         </tr>
@@ -196,6 +204,17 @@
                 <option value="{{ cat }}">{{ cat }}</option>
               {% endfor %}
             </select>
+          </div>
+
+          <div class="form-group col-span-2">
+            <label for="p-proveedor">Proveedor / Fabricante</label>
+            <select id="p-proveedor" name="proveedor_id" class="form-select">
+              <option value="">-- Sin Proveedor Asignado --</option>
+              {% for prov in proveedores %}
+                <option value="{{ prov.id }}">{{ prov.nombre }} ({{ prov.codigo }})</option>
+              {% endfor %}
+            </select>
+            <span class="form-helper">Permite rastrear qué proveedor suministró esta mercancía</span>
           </div>
 
           <div class="form-group col-span-2">
@@ -290,6 +309,8 @@
     document.getElementById('modal-prenda-title').textContent = 'Registrar Nueva Prenda';
     document.getElementById('btn-submit-prenda').textContent = 'Guardar Prenda';
     document.getElementById('p-stock').disabled = false;
+    const provSelect = document.getElementById('p-proveedor');
+    if (provSelect) provSelect.value = '';
     resetImagePreview();
     actualizarEquivalenteBs(0);
     openModal('modal-prenda');
@@ -304,6 +325,8 @@
     document.getElementById('p-codigo').value = prenda.codigo;
     document.getElementById('p-nombre').value = prenda.nombre;
     document.getElementById('p-categoria').value = prenda.categoria;
+    const provSelect = document.getElementById('p-proveedor');
+    if (provSelect) provSelect.value = prenda.proveedor_id || '';
     document.getElementById('p-talla').value = prenda.talla;
     document.getElementById('p-color').value = prenda.color;
     document.getElementById('p-costo').value = prenda.precio_costo;

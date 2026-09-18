@@ -260,32 +260,42 @@ def get_tasa_dolar():
 # Funciones de prendas
 def get_todas_prendas(solo_activas=True, filtro_busqueda=None, categoria=None, solo_stock_bajo=False):
     conn = get_db()
-    query = 'SELECT * FROM prendas WHERE 1=1'
+    query = '''
+        SELECT p.*, prov.nombre as proveedor_nombre, prov.codigo as proveedor_codigo
+        FROM prendas p
+        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
+        WHERE 1=1
+    '''
     params = []
 
     if solo_activas:
-        query += ' AND activo = 1'
+        query += ' AND p.activo = 1'
     
     if categoria and categoria != 'TODAS':
-        query += ' AND categoria = ?'
+        query += ' AND p.categoria = ?'
         params.append(categoria)
 
     if filtro_busqueda:
-        query += ' AND (codigo LIKE ? OR nombre LIKE ? OR color LIKE ?)'
+        query += ' AND (p.codigo LIKE ? OR p.nombre LIKE ? OR p.color LIKE ? OR prov.nombre LIKE ?)'
         like_term = f"%{filtro_busqueda}%"
-        params.extend([like_term, like_term, like_term])
+        params.extend([like_term, like_term, like_term, like_term])
 
     if solo_stock_bajo:
-        query += ' AND stock <= stock_minimo'
+        query += ' AND p.stock <= p.stock_minimo'
 
-    query += ' ORDER BY stock ASC, id DESC'
+    query += ' ORDER BY p.stock ASC, p.id DESC'
     rows = conn.execute(query, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 def get_prenda_por_id(prenda_id):
     conn = get_db()
-    row = conn.execute('SELECT * FROM prendas WHERE id = ?', (prenda_id,)).fetchone()
+    row = conn.execute('''
+        SELECT p.*, prov.nombre as proveedor_nombre, prov.codigo as proveedor_codigo
+        FROM prendas p
+        LEFT JOIN proveedores prov ON p.proveedor_id = prov.id
+        WHERE p.id = ?
+    ''', (prenda_id,)).fetchone()
     conn.close()
     return dict(row) if row else None
 
@@ -315,9 +325,16 @@ def crear_prenda(datos):
     conn = get_db()
     cursor = conn.cursor()
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    proveedor_id = datos.get('proveedor_id')
+    if proveedor_id and str(proveedor_id).strip() not in ('', '0', 'None'):
+        proveedor_id = int(proveedor_id)
+    else:
+        proveedor_id = None
+
     cursor.execute('''
-        INSERT INTO prendas (codigo, nombre, categoria, talla, color, precio_costo, precio_venta, stock, stock_minimo, fecha_creacion, imagen)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO prendas (codigo, nombre, categoria, talla, color, precio_costo, precio_venta, stock, stock_minimo, fecha_creacion, imagen, proveedor_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         datos['codigo'].strip().upper(),
         datos['nombre'].strip(),
@@ -329,7 +346,8 @@ def crear_prenda(datos):
         int(datos.get('stock', 0)),
         int(datos.get('stock_minimo', 2)),
         now_str,
-        datos.get('imagen', '').strip()
+        datos.get('imagen', '').strip(),
+        proveedor_id
     ))
     nuevo_id = cursor.lastrowid
     conn.commit()
@@ -338,6 +356,13 @@ def crear_prenda(datos):
 
 def actualizar_prenda(prenda_id, datos):
     conn = get_db()
+    
+    proveedor_id = datos.get('proveedor_id')
+    if proveedor_id and str(proveedor_id).strip() not in ('', '0', 'None'):
+        proveedor_id = int(proveedor_id)
+    else:
+        proveedor_id = None
+
     # Si no se envía nueva imagen, preservar la actual
     if 'imagen' in datos and datos['imagen']:
         conn.execute('''
@@ -351,7 +376,8 @@ def actualizar_prenda(prenda_id, datos):
                 precio_venta = ?,
                 stock = ?,
                 stock_minimo = ?,
-                imagen = ?
+                imagen = ?,
+                proveedor_id = ?
             WHERE id = ?
         ''', (
             datos['codigo'].strip().upper(),
@@ -364,6 +390,7 @@ def actualizar_prenda(prenda_id, datos):
             int(datos.get('stock', 0)),
             int(datos.get('stock_minimo', 2)),
             datos['imagen'].strip(),
+            proveedor_id,
             prenda_id
         ))
     else:
@@ -377,7 +404,8 @@ def actualizar_prenda(prenda_id, datos):
                 precio_costo = ?,
                 precio_venta = ?,
                 stock = ?,
-                stock_minimo = ?
+                stock_minimo = ?,
+                proveedor_id = ?
             WHERE id = ?
         ''', (
             datos['codigo'].strip().upper(),
@@ -389,6 +417,7 @@ def actualizar_prenda(prenda_id, datos):
             float(datos.get('precio_venta', 0)),
             int(datos.get('stock', 0)),
             int(datos.get('stock_minimo', 2)),
+            proveedor_id,
             prenda_id
         ))
     conn.commit()

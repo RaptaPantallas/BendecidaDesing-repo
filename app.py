@@ -130,12 +130,14 @@ def inventario():
         solo_stock_bajo=stock_bajo
     )
     categorias = db.get_categorias()
+    proveedores = db.get_todos_proveedores(solo_activos=True)
     tasa = db.get_tasa_dolar()
     
     return render_template(
         'inventario.html',
         prendas=prendas,
         categorias=categorias,
+        proveedores=proveedores,
         busqueda=busqueda,
         categoria_actual=categoria,
         stock_bajo=stock_bajo,
